@@ -1,0 +1,143 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px);
+  overflow: hidden;
+  background: var(--bg0);
+  margin: 0 -24px; /* compensate parent padding */
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editorArea {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg2);
+}
+
+/* TipTap editor styles */
+.proseMirror {
+  outline: none;
+  min-height: 420px;
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--tx);
+  font-family: var(--font-body);
+  padding: 32px 40px;
+  max-width: 740px;
+  margin: 0 auto;
+}
+
+/* Styling the ProseMirror content via global scope since CSS modules can't target nested generated elements */
+:global(.ProseMirror) {
+  outline: none;
+  min-height: 420px;
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--tx);
+  font-family: var(--font-body);
+  padding: 32px 40px;
+  max-width: 740px;
+  margin: 0 auto;
+}
+
+:global(.ProseMirror h1) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  margin-bottom: 12px;
+  margin-top: 24px;
+}
+
+:global(.ProseMirror h2) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 10px;
+  margin-top: 20px;
+}
+
+:global(.ProseMirror h3) {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  margin-bottom: 8px;
+  margin-top: 16px;
+}
+
+:global(.ProseMirror p) {
+  margin-bottom: 12px;
+}
+
+:global(.ProseMirror strong) {
+  color: var(--acc);
+  font-weight: 600;
+}
+
+:global(.ProseMirror code) {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: var(--bg1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--acc2);
+}
+
+:global(.ProseMirror pre) {
+  background: var(--bg1);
+  border: 1px solid var(--brd);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+:global(.ProseMirror pre code) {
+  background: none;
+  padding: 0;
+  font-size: 14px;
+  color: var(--tx);
+}
+
+:global(.ProseMirror blockquote) {
+  border-left: 3px solid #A78BFA;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: var(--tx2);
+  font-style: italic;
+}
+
+:global(.ProseMirror ul),
+:global(.ProseMirror ol) {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+:global(.ProseMirror li) {
+  margin-bottom: 4px;
+}
+
+:global(.ProseMirror mark) {
+  background: rgba(212, 160, 48, 0.25);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+:global(.ProseMirror p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--tx3);
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+:global(.ProseMirror hr) {
+  border: none;
+  border-top: 1px dashed var(--brd2);
+  margin: 24px 0;
+}

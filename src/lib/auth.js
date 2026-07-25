@@ -1,0 +1,72 @@
+/**
+ * Auth helpers — Summa.sh
+ * Supabase Auth (email/password + Google OAuth)
+ */
+import { supabase } from './supabase';
+
+// ── Sign Up ───────────────────────────────────────────────────
+export async function signUp(email, password, metadata = {}) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: metadata, // → user_metadata (name, avatar_url, etc.)
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
+// ── Sign In (email/password) ──────────────────────────────────
+export async function signIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
+
+// ── Sign In (Google OAuth) ────────────────────────────────────
+export async function signInWithGoogle() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  if (error) throw error;
+  return data;
+}
+
+// ── Sign Out ──────────────────────────────────────────────────
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+// ── Session ───────────────────────────────────────────────────
+export async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
+}
+
+export function getUser() {
+  return supabase.auth.getUser();
+}
+
+// ── Auth State Listener ───────────────────────────────────────
+export function onAuthStateChange(callback) {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (event, session) => callback(event, session)
+  );
+  return subscription;
+}
+
+// ── Password Reset ────────────────────────────────────────────
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`
+  });
+  if (error) throw error;
+}
+
+export async function updatePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}

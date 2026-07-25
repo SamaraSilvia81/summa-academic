@@ -1,0 +1,31 @@
+@keyframes glow {
+  0%, 100% { filter: drop-shadow(0 0 8px var(--acc-glow)); }
+  50% { filter: drop-shadow(0 0 24px var(--acc-glow)); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.loading {
+  position: fixed; inset: 0; z-index: 9000;
+  background: var(--bg0);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.logo {
+  width: 48px; height: 48px;
+  animation: glow 1.5s ease-in-out infinite;
+  margin-bottom: 24px;
+}
+.steps { list-style: none; width: 300px; }
+.step {
+  font-family: var(--font-mono);
+  font-size: 16px; color: var(--tx3);
+  padding: 10px 0;
+  display: flex; align-items: center; gap: 10px;
+  opacity: 0; animation: slideUp 0.4s ease forwards;
+}
+.check { color: var(--acc); font-size: 17px; opacity: 0; transition: opacity 0.3s; }
+.done { color: var(--tx); }
+.done .check { opacity: 1; }

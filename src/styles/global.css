@@ -1,0 +1,189 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Accent - Dourado */
+  --acc: #D4A030;
+  --acc2: #E8C060;
+  --acc3: #B8862A;
+  --acc-bg: rgba(212,160,48,0.10);
+  --acc-bg2: rgba(212,160,48,0.06);
+  --acc-glow: rgba(212,160,48,0.25);
+
+  /* Font families as CSS vars for use in components */
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-quote: 'Playfair Display', serif;
+
+  /* Backgrounds - Dark */
+  --bg0: #04070d;
+  --bg1: #080c14;
+  --bg2: #0e1119;
+  --bg3: #161a24;
+  --bg4: #1e2230;
+  --bg5: #262a38;
+
+  /* Text */
+  --tx: #E2DED8;
+  --tx2: #8A8680;
+  --tx3: #4E4C48;
+
+  /* Borders */
+  --brd: rgba(255,255,255,0.06);
+  --brd2: rgba(255,255,255,0.1);
+
+  /* Semantic */
+  --green: #4ADE80;
+  --green-bg: rgba(74,222,128,0.08);
+  --red: #F87171;
+  --red-bg: rgba(248,113,113,0.08);
+  --blue: #60A5FA;
+  --blue-bg: rgba(96,165,250,0.08);
+
+  /* Radius */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 10px;
+
+  /* Typography scale */
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-quote: 'Playfair Display', serif;
+
+  /* Sidebar */
+  --sidebar-w: 56px;
+  --sidebar-w-open: 196px;
+}
+
+/* ── Light Mode ────────────────────────────────────────── */
+body.light {
+  --acc: #9D6A14;
+  --acc2: #B88724;
+  --acc3: #7A4F0D;
+  --acc-bg: rgba(157,106,20,0.12);
+  --acc-bg2: rgba(157,106,20,0.07);
+  --acc-glow: rgba(157,106,20,0.10);
+  --bg0: #F4EFE5;
+  --bg1: #EDE5D8;
+  --bg2: #FFF9EF;
+  --bg3: #F3EBDD;
+  --bg4: #E2D4BF;
+  --bg5: #D6C5A9;
+  --tx: #171512;
+  --tx2: #655E52;
+  --tx3: #9A8D79;
+  --brd: rgba(45,34,20,0.11);
+  --brd2: rgba(45,34,20,0.18);
+}
+
+/* ── Base Reset ────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html { font-size: 17px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg0);
+  color: var(--tx);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Textures ──────────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 45%, transparent 56%, rgba(0,0,0,0.34) 100%);
+  mix-blend-mode: screen;
+  opacity: 0.42;
+}
+
+body.no-grain::after { display: none; }
+body.no-scanlines::before { display: none; }
+
+/* Usada só na tela de login (Summa tem ilustração com textura própria,
+   então o grão global some no login pra não dobrar a poluição visual) */
+body.auth-quiet-grain::after { opacity: 0.012; }
+body.auth-quiet-grain::before { opacity: 0.16; }
+
+body.light::after { opacity: 0.045; }
+body.light::before {
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.035) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 45%, transparent 58%, rgba(80,55,20,0.16) 100%);
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+/* ── Typography Utilities ──────────────────────────────── */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-quote { font-family: var(--font-quote); }
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--bg4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--bg5); }
+
+/* ── Selection ─────────────────────────────────────────── */
+::selection {
+  background: var(--acc-bg);
+  color: var(--acc);
+}
+
+/* ── Animations ────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes glow {
+  0%, 100% { text-shadow: 0 0 8px var(--acc-glow); }
+  50% { text-shadow: 0 0 16px rgba(212,160,48,0.4); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}

@@ -1,0 +1,324 @@
+﻿/* Este arquivo usa @apply do Tailwind (3.4.17) por baixo — as classes
+   continuam vindo do design system (theme.extend em tailwind.config.js,
+   que por sua vez lê as CSS vars de global.css). O JSX só referencia
+   nomes semânticos (styles.container, styles.left, etc.), sem utility
+   classes soltas no markup. */
+
+/* ---- CONTAINER PRINCIPAL ---- */
+.container {
+  @apply flex min-h-screen w-full overflow-hidden bg-bg0 font-body text-tx;
+}
+
+/* ---- LADO ESQUERDO (ILUSTRAÇÃO) ---- */
+.left {
+  @apply relative flex min-h-screen flex-1 items-end bg-[#ebe4d6] bg-cover bg-no-repeat;
+  flex-basis: 46%;
+  background-image: url('/imagem.jpg');
+  background-position: center 42%;
+}
+
+/* Véu de leitura só na base — a ilustração respira, não fica sufocada */
+.leftScrim {
+  @apply pointer-events-none absolute inset-0;
+  background: linear-gradient(
+    to top,
+    var(--bg0) 0%,
+    rgba(4, 7, 13, 0.72) 16%,
+    rgba(4, 7, 13, 0.2) 38%,
+    transparent 58%
+  );
+}
+
+.leftContent {
+  @apply relative z-10 flex flex-col items-start px-14 pb-12;
+}
+
+/* Selo: o logo-white.png não tem fundo transparente, então em vez de
+   deixar o quadrado escuro "sobrar" sobre a ilustração, tratamos como
+   um selo/carimbo intencional — remete a selo de cartório/manuscrito. */
+.symbol {
+  @apply mb-[1.1rem] rounded-md object-cover;
+  width: 46px;
+  height: 46px;
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 48, 0.4),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.wordmark {
+  @apply font-quote italic font-medium leading-none tracking-[-0.01em] text-white;
+  font-size: 2.6rem;
+}
+
+.wordmark b {
+  @apply font-bold not-italic;
+}
+
+.tagline {
+  @apply mt-[0.6rem] font-mono lowercase tracking-[0.08em];
+  font-size: 0.78rem;
+  color: rgba(230, 224, 212, 0.6);
+}
+
+.leftFootnote {
+  @apply absolute left-14 top-8 z-10 font-mono tracking-[0.06em] text-white/55;
+  font-size: 0.7rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- LADO DIREITO (FORMULÁRIO) ---- */
+.right {
+  @apply relative flex min-h-screen flex-1 items-center justify-center overflow-hidden border-l border-brd bg-bg1 p-10;
+  flex-basis: 54%;
+}
+
+/* Blobs — gradiente na paleta dourada da marca (acc → acc2 → acc3),
+   difusos, no estilo tailwindflex/color-blur — mas contidos nos cantos
+   pra não lavar o contraste do CTA (que também é dourado) */
+.blob1 {
+  @apply pointer-events-none absolute z-0 animate-blobfloat rounded-full bg-gradient-to-br from-acc via-acc2 to-acc3 opacity-25 blur-3xl;
+  top: -160px;
+  right: -160px;
+  width: 380px;
+  height: 380px;
+}
+
+/* .blob2 {
+  @apply pointer-events-none absolute z-0 animate-blobfloat2 rounded-full bg-gradient-to-tr from-acc3 via-acc to-acc2 opacity-20 blur-3xl;
+  bottom: -180px;
+  left: -140px;
+  width: 360px;
+  height: 360px;
+} */
+
+.blob3 {
+  @apply pointer-events-none absolute z-0 animate-blobfloat rounded-full bg-gradient-to-b from-acc2 to-acc opacity-10 blur-3xl;
+  top: 30%;
+  right: 12%;
+  width: 220px;
+  height: 220px;
+}
+
+/* Textura de "papel pautado" — sutil, coerente com uma bancada de escrita */
+.ruledPaper {
+  @apply pointer-events-none absolute inset-0 z-0;
+  opacity: 0.1;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 35px,
+    var(--brd) 35px,
+    var(--brd) 36px
+  );
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 40%, #000 0%, transparent 75%);
+}
+
+/* Textura grainy — pontinhos brancos difusos sobre o painel do formulário */
+.grainyTexture {
+  @apply pointer-events-none absolute inset-0 z-[1];
+  background-image: url('/grainly-texture.png');
+  background-size: 320px;
+  background-repeat: repeat;
+  opacity: 0.06;
+  mix-blend-mode: screen;
+}
+
+/* ---- DARK MODE TOGGLE (lateral) ---- */
+.themeToggle {
+  @apply fixed right-0 z-50 flex cursor-pointer items-center gap-2 rounded-l-full py-3 pl-3 text-bg0;
+  top: 33%;
+  background: var(--acc);
+  width: 48px;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -2px 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.themeToggle:hover {
+  background: var(--acc2);
+}
+
+.themeLabel {
+  @apply whitespace-nowrap font-mono text-[0.78rem] font-semibold;
+  animation: fadeInLabel 0.15s ease;
+}
+
+@keyframes fadeInLabel {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.formWrapper {
+  @apply relative z-10 flex w-full flex-col gap-6;
+  max-width: 380px;
+}
+
+.eyebrow {
+  @apply mb-3 inline-block font-mono font-semibold uppercase tracking-[0.12em] text-acc;
+  font-size: 0.7rem;
+}
+
+.header h2 {
+  @apply mb-[0.35rem] font-quote font-semibold tracking-[-0.01em] text-tx;
+  font-size: 2.1rem;
+}
+
+.header p {
+  @apply text-tx2;
+  font-size: 0.92rem;
+}
+
+/* ---- AVATAR ROW ---- */
+.avatarRow {
+  @apply flex items-center gap-5;
+}
+
+.avatarPreview {
+  @apply flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full text-white;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  transition: background-color 0.2s ease;
+}
+
+.avatarInitials {
+  @apply font-bold leading-none tracking-wide;
+  font-size: 1.35rem;
+}
+
+.avatarColors {
+  @apply flex flex-wrap gap-[0.55rem];
+}
+
+.colorDot {
+  @apply h-[26px] w-[26px] cursor-pointer rounded-full border-2 border-transparent transition-all;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.colorDot:hover {
+  @apply scale-110;
+}
+
+.colorDotActive {
+  @apply border-white;
+  box-shadow:
+    0 0 0 2px var(--bg0),
+    0 0 0 4px currentColor;
+}
+
+/* ---- FORMULÁRIO ---- */
+.form {
+  @apply flex flex-col gap-[1.15rem];
+}
+
+.field {
+  @apply flex flex-col gap-[0.4rem];
+}
+
+.field label {
+  @apply font-mono font-semibold uppercase tracking-[0.06em] text-tx2;
+  font-size: 0.72rem;
+}
+
+.field input {
+  @apply w-full rounded-lg border border-brd2 bg-bg2 px-4 py-[0.85rem] text-tx outline-none transition-colors placeholder:text-tx3 focus:border-acc focus:ring-[3px] focus:ring-acc-bg2 disabled:cursor-progress disabled:opacity-50;
+  font-size: 0.95rem;
+}
+
+.passwordWrapper {
+  @apply flex items-center rounded-lg border border-brd2 bg-bg2 transition-colors focus-within:border-acc focus-within:ring-[3px] focus-within:ring-acc-bg2;
+}
+
+.passwordWrapper input {
+  @apply flex-1 bg-transparent px-4 py-[0.85rem] text-tx outline-none placeholder:text-tx3 disabled:cursor-progress disabled:opacity-50;
+  border: none;
+}
+
+.eyeBtn {
+  @apply flex h-full items-center px-[0.9rem] text-tx3 transition-colors hover:text-tx;
+}
+
+.options {
+  @apply flex items-center justify-between text-[0.85rem];
+  margin-top: -0.2rem;
+}
+
+.remember {
+  @apply flex cursor-pointer select-none items-center gap-2 text-tx2;
+}
+
+.remember input {
+  @apply m-0 cursor-pointer accent-acc;
+  width: 15px;
+  height: 15px;
+}
+
+.forgot {
+  @apply text-[0.85rem] font-medium text-acc transition-opacity hover:opacity-70;
+}
+
+.error,
+.message {
+  @apply rounded-md px-[0.9rem] py-[0.65rem] text-[0.85rem] leading-snug;
+}
+
+.error {
+  @apply bg-red-bg text-red;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.message {
+  @apply bg-green-bg text-green;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.primary {
+  @apply mt-[0.2rem] flex items-center justify-center gap-[0.6rem] rounded-lg bg-acc px-5 py-[0.85rem] font-bold text-bg0 transition-all hover:-translate-y-px hover:bg-acc2 active:translate-y-0 disabled:cursor-progress disabled:translate-y-0 disabled:opacity-60;
+  font-size: 0.95rem;
+}
+
+.divider {
+  @apply my-[0.1rem] flex items-center gap-4 font-mono tracking-[0.04em] text-tx3;
+  font-size: 0.7rem;
+}
+
+.divider::before,
+.divider::after {
+  @apply h-px flex-1 bg-brd2;
+  content: '';
+}
+
+.google {
+  @apply flex items-center justify-center gap-[0.7rem] rounded-lg border border-brd2 bg-bg2 px-4 py-[0.8rem] font-medium text-tx transition-colors hover:border-tx3 hover:bg-bg3 disabled:cursor-progress disabled:opacity-50;
+  font-size: 0.9rem;
+}
+
+.switch {
+  @apply px-2 py-[0.4rem] text-center text-[0.88rem] font-medium text-acc transition-opacity hover:opacity-70;
+}
+
+.footer {
+  @apply mt-[0.4rem] text-center font-mono tracking-[0.04em] text-tx3;
+  font-size: 0.68rem;
+}
+
+/* ---- RESPONSIVO ---- */
+@media (max-width: 860px) {
+  .left {
+    display: none;
+  }
+  .right {
+    @apply items-center border-l-0 px-6 py-8;
+    flex-basis: 100%;
+  }
+  .formWrapper {
+    max-width: 100%;
+  }
+  .header h2 {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header h2 {
+    font-size: 1.5rem;
+  }
+}

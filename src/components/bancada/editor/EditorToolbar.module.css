@@ -1,0 +1,138 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--brd);
+  background: var(--bg1);
+  flex-shrink: 0;
+}
+
+.backBtn {
+  background: none;
+  border: 1px solid var(--brd);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--tx2);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  transition: all 0.15s;
+}
+.backBtn:hover {
+  background: var(--bg3);
+  color: var(--tx);
+}
+
+.docTitle {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.sep {
+  width: 1px;
+  height: 16px;
+  background: var(--brd);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.group {
+  display: flex;
+  gap: 1px;
+}
+
+.toolBtn {
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--tx3);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+}
+.toolBtn:hover {
+  background: var(--bg3);
+  color: var(--tx);
+}
+.toolBtnActive {
+  background: var(--acc-bg);
+  color: var(--acc);
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wordCount {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--tx3);
+}
+
+.saveStatus {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.statusBadge {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.saveBtn {
+  background: var(--acc);
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bg0);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.15s;
+}
+.saveBtn:hover { opacity: 0.85; }
+
+.exportBtn {
+  background: var(--bg3);
+  border: 1px solid var(--brd);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--tx2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.exportBtn:hover {
+  background: var(--bg4);
+  color: var(--tx);
+}
