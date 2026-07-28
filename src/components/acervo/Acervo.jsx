@@ -4,9 +4,9 @@ import {
   MagnifyingGlass, Star, Plus, X, Paperclip, DownloadSimple,
   Trash, CloudArrowUp, FilePdf, Spinner, LinkSimple, ArrowSquareOut,
   SquaresFour, Rows, FolderPlus, FolderOpen, PencilSimple,
-  ShareNetwork, CaretLeft, Folder,
+  ShareNetwork, CaretLeft, Folder, Funnel,
   FileImage, FileVideo, FileAudio, FileDoc, FileZip, File as FileGeneric,
-  DotsThree, BookOpenText, BookmarkSimple,
+  BookOpenText, BookmarkSimple,
 } from '@phosphor-icons/react';
 import { useReferences } from '../../hooks/useData';
 import { Leitura } from './Leitura';
@@ -23,39 +23,16 @@ import { getReferenceFileUrl } from '../../lib/storage';
 import { ReferenceFolderRepo } from '../../services/repositories';
 
 // ─────────────────────────────────────────────
-// InlineInput
-// ─────────────────────────────────────────────
-
-function InlineInput({ value, onConfirm, onCancel, placeholder = 'nome...' }) {
-  const [draft, setDraft] = useState(value || '');
-  return (
-    <input
-      autoFocus
-      value={draft}
-      placeholder={placeholder}
-      onChange={e => setDraft(e.target.value)}
-      onClick={e => e.stopPropagation()}
-      onKeyDown={e => {
-        if (e.key === 'Enter' && draft.trim()) onConfirm(draft.trim());
-        if (e.key === 'Escape') onCancel();
-      }}
-      onBlur={() => draft.trim() ? onConfirm(draft.trim()) : onCancel()}
-      style={{
-        flex: 1, minWidth: 0, background: 'var(--bg3)',
-        border: '1px solid rgba(212,160,48,0.35)', borderRadius: 'var(--r-sm)',
-        padding: '3px 8px', color: 'var(--tx)',
-        fontFamily: 'var(--font-mono)', fontSize: 13, outline: 'none',
-        width: '100%',
-      }}
-    />
-  );
-}
-
-// ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
 
 const FILTERS = ['todos', 'papers', 'meus artigos', 'datasets', 'notas', 'favoritos'];
+
+const SORT_OPTIONS = [
+  { value: 'recent', label: 'recentes' },
+  { value: 'az', label: 'a–z' },
+  { value: 'year', label: 'ano' },
+];
 
 const TYPE_OPTIONS = [
   { value: 'paper_read', label: 'paper lido' },
@@ -192,7 +169,7 @@ export function Acervo({ profileId }) {
   const dispatch = useDispatch();
   const references = useReferences(profileId);
   const {
-    folders, createFolder, updateFolder, renameFolder,
+    folders, createFolder, updateFolder,
     deleteFolder, addRefToFolder,
   } = useReferenceFolders(profileId);
 
@@ -200,6 +177,10 @@ export function Acervo({ profileId }) {
   const [readingRef, setReadingRef] = useState(null); // referência aberta pra leitura direta
   const [activeFilter, setActiveFilter] = useState('todos');
   const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('recent');
+  const [filterYear, setFilterYear] = useState('todos');
+  const [filterHasFile, setFilterHasFile] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [view, setView] = useState('grid');
   const [currentFolder, setCurrentFolder] = useState(null); // folder id ou null
@@ -218,6 +199,19 @@ export function Acervo({ profileId }) {
 
   // IDs de referências que estão na pasta atual
   const folderRefIds = currentFolderObj ? new Set(currentFolderObj.refIds || []) : null;
+
+  // Anos disponíveis (para o filtro de ano) e flag de filtros ativos
+  const availableYears = Array.from(
+    new Set((references || []).map((r) => r.year).filter(Boolean))
+  ).sort((a, b) => b - a);
+
+  const hasActiveFilters = sortBy !== 'recent' || filterYear !== 'todos' || filterHasFile;
+
+  function clearFilters() {
+    setSortBy('recent');
+    setFilterYear('todos');
+    setFilterHasFile(false);
+  }
 
   const filtered = (references || []).filter((ref) => {
     if (folderRefIds !== null) {
@@ -240,6 +234,16 @@ export function Acervo({ profileId }) {
     return ref.title.toLowerCase().includes(q) ||
       ref.authors?.toLowerCase().includes(q) ||
       (ref.tags || []).some((t) => t.toLowerCase().includes(q));
+  }).filter((ref) => {
+    if (filterYear === 'todos') return true;
+    return String(ref.year) === String(filterYear);
+  }).filter((ref) => {
+    if (!filterHasFile) return true;
+    return !!ref.filePath;
+  }).sort((a, b) => {
+    if (sortBy === 'az') return (a.title || '').localeCompare(b.title || '');
+    if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 
   // Na raiz, as pastas já são renderizadas acima independente de filtro/busca —
@@ -308,36 +312,43 @@ export function Acervo({ profileId }) {
           position: 'relative', zIndex: 3, padding: '36px 32px 28px',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div>
-            <div style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
-              color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.12em',
-              marginBottom: 4,
-            }}>
-              — acervo
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            gap: 16, flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.12em',
+                marginBottom: 4,
+              }}>
+                — acervo
+              </div>
+              <div style={{
+                fontFamily: 'var(--font-display)', fontWeight: 800,
+                fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', color: '#fff',
+                lineHeight: 1.1, letterSpacing: '-0.02em',
+              }}>
+                Minha <span style={{ color: 'var(--acc)' }}>Biblioteca</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, margin: '15px 0 0', marginLeft: '45rem', flexWrap: 'wrap', justifyContent: 'flex-end', position: 'absolute', right: 32, bottom: 165 }}>
+
+            <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               {[
                 ['referencias', 'Referências', BookmarkSimple],
                 ['leitura', 'Leitura', BookOpenText],
               ].map(([key, label, Icon]) => (
                 <button key={key} onClick={() => setActiveTab(key)} style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
-                  padding: '7px 12px', cursor: 'pointer', background: 'none',
-                  border: 'none', width: '30%', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
+                  fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
+                  padding: '6px 14px', cursor: 'pointer', background: 'none',
+                  border: 'none', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
                   color: activeTab === key ? 'var(--tx)' : 'var(--tx3)',
+                  whiteSpace: 'nowrap',
                 }}>
                   <Icon size={14} weight={activeTab === key ? 'fill' : 'regular'} /> {label}
                 </button>
               ))}
-            </div>
-            <div style={{
-              fontFamily: 'var(--font-display)', fontWeight: 800,
-              fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', color: '#fff',
-              lineHeight: 1.1, letterSpacing: '-0.02em',
-            }}>
-              Minha <span style={{ color: 'var(--acc)' }}>Biblioteca</span>
             </div>
           </div>
 
@@ -372,24 +383,6 @@ export function Acervo({ profileId }) {
           </div>
         </div>
       </div>
-
-      {/* ── Sub-abas ── */}
-      {/* <div style={{ display: 'flex', gap: 4, margin: '15px 0 0' }}>
-        {[
-          ['referencias', 'Referências', BookmarkSimple],
-          ['leitura', 'Leitura', BookOpenText],
-        ].map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setActiveTab(key)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
-            padding: '7px 12px', cursor: 'pointer', background: 'none',
-            border: 'none', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
-            color: activeTab === key ? 'var(--tx)' : 'var(--tx3)',
-          }}>
-            <Icon size={14} weight={activeTab === key ? 'fill' : 'regular'} /> {label}
-          </button>
-        ))}
-      </div> */}
 
       {activeTab === 'leitura' && (
         <Leitura
@@ -426,7 +419,7 @@ export function Acervo({ profileId }) {
       {/* ══════════════════ TOOLBAR ══════════════════ */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        marginBottom: 14, flexWrap: 'wrap',
+        marginBottom: filtersOpen ? 10 : 14, flexWrap: 'wrap',
       }}>
         {/* Filter tabs */}
         <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
@@ -444,6 +437,17 @@ export function Acervo({ profileId }) {
             </button>
           ))}
         </div>
+
+        {/* Funnel: painel de filtros avançados */}
+        <button onClick={() => setFiltersOpen(v => !v)} title="filtros" style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          background: filtersOpen ? 'var(--bg4)' : (hasActiveFilters ? 'var(--acc-bg)' : 'var(--bg2)'),
+          border: `1px solid ${filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--brd)'}`,
+          borderRadius: 'var(--r-md)', padding: '6px 9px', cursor: 'pointer',
+          color: filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--tx3)',
+        }}>
+          <Funnel size={14} weight={hasActiveFilters ? 'fill' : 'regular'} />
+        </button>
 
         {/* View toggle */}
         <div style={{
@@ -484,6 +488,59 @@ export function Acervo({ profileId }) {
         </button>
       </div>
 
+      {/* ── Painel de filtros ── */}
+      {filtersOpen && (
+        <div style={{
+          background: 'var(--bg1)', border: '1px solid var(--brd2)',
+          borderRadius: 'var(--r-lg)', padding: '14px 16px', marginBottom: 14,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 20,
+        }}>
+          <div>
+            <label style={labelStyle}>ordenar por</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {SORT_OPTIONS.map(opt => (
+                <button key={opt.value} onClick={() => setSortBy(opt.value)} style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
+                  padding: '4px 10px', cursor: 'pointer', borderRadius: 'var(--r-sm)',
+                  border: sortBy === opt.value ? '1px solid var(--acc)' : '1px solid var(--brd2)',
+                  background: sortBy === opt.value ? 'var(--acc-bg)' : 'transparent',
+                  color: sortBy === opt.value ? 'var(--acc)' : 'var(--tx3)',
+                }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>ano</label>
+            <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{
+              background: 'var(--bg2)', border: '1px solid var(--brd2)', borderRadius: 'var(--r-sm)',
+              padding: '5px 8px', color: 'var(--tx)', fontFamily: 'var(--font-mono)', fontSize: 12,
+              outline: 'none', cursor: 'pointer',
+            }}>
+              <option value="todos">todos</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
+            <input type="checkbox" checked={filterHasFile} onChange={e => setFilterHasFile(e.target.checked)} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx2)' }}>c/ arquivo</span>
+          </label>
+
+          {hasActiveFilters && (
+            <button onClick={clearFilters} style={{
+              marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)',
+              textDecoration: 'underline', padding: 0,
+            }}>
+              limpar
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Pastas (só na raiz) ── */}
       {!currentFolder && folders.length > 0 && (
         <div style={{
@@ -502,7 +559,6 @@ export function Acervo({ profileId }) {
               onEdit={() => setEditFolderOpen(folder.id)}
               onDelete={() => setConfirmDeleteFolder(folder)}
               onShare={() => shareFolder(folder)}
-              onRename={(id, name) => renameFolder(id, name)}
               onDropRef={addRefToFolder}
             />
           ))}
@@ -674,9 +730,8 @@ function DeleteFolderModal({ folder, count, deleting, onCancel, onConfirm }) {
 // FolderCard
 // ─────────────────────────────────────────────
 
-function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, onRename, onDropRef }) {
+function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, onDropRef }) {
   const [hover, setHover] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const count = (allRefs || []).filter(r => (folder.refIds || []).includes(r.id)).length;
   const fc = folder.color || 'var(--acc)';
@@ -690,7 +745,7 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
 
   if (view === 'list') return (
     <div
-      onClick={() => !editing && onOpen()}
+      onClick={onOpen}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -704,37 +759,26 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
       }}
     >
       <FolderOpen size={14} color={fc} weight="duotone" style={{ flexShrink: 0 }} />
-      {editing ? (
-        <InlineInput
-          value={folder.name}
-          onConfirm={name => { onRename?.(folder.id, name); setEditing(false); }}
-          onCancel={() => setEditing(false)}
-        />
-      ) : (
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--tx)', flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {folder.name}/
-          {folder.isProject && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.35)', borderRadius: 3, padding: '1px 5px' }}>projeto</span>
-          )}
-        </span>
-      )}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--tx)', flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {folder.name}/
+        {folder.isProject && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.35)', borderRadius: 3, padding: '1px 5px' }}>projeto</span>
+        )}
+      </span>
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)', flexShrink: 0 }}>
         {count} item{count !== 1 ? 's' : ''}
       </span>
-      {hover && !editing && (
-        <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-          <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
-          {/* <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} /> */}
-          <FolderBtn title="editar pasta"icon={<PencilSimple size={11} />} onClick={onEdit} />
-          <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+        <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
+        <FolderBtn title="editar pasta" icon={<PencilSimple size={11} />} onClick={onEdit} />
+        <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
+      </div>
     </div>
   );
 
   return (
     <div
-      onClick={() => !editing && onOpen()}
+      onClick={onOpen}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -758,22 +802,14 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: fc, flexShrink: 0 }} />
-              {editing ? (
-                <InlineInput
-                  value={folder.name}
-                  onConfirm={name => { onRename?.(folder.id, name); setEditing(false); }}
-                  onCancel={() => setEditing(false)}
-                />
-              ) : (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {folder.name}/
-                </span>
-              )}
-              {folder.isProject && !editing && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {folder.name}/
+              </span>
+              {folder.isProject && (
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.35)', borderRadius: 3, padding: '1px 5px', flexShrink: 0 }}>projeto</span>
               )}
             </div>
-            {folder.description && !editing && (
+            {folder.description && (
               <div style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginTop: 2,
                 overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
@@ -783,14 +819,11 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
               </div>
             )}
           </div>
-          {hover && !editing && (
-            <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
-              {/* <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} /> */}
-              <FolderBtn title="editar pasta" icon={<PencilSimple size={11} />} onClick={onEdit} />
-              <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
+            <FolderBtn title="editar pasta" icon={<PencilSimple size={11} />} onClick={onEdit} />
+            <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
+          </div>
         </div>
         <span style={{
           marginTop: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11,
