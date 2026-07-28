@@ -317,10 +317,81 @@ export function Acervo({ profileId }) {
 
       {activeTab === 'referencias' && (<>
 
+      {/* ══════════════════ HERO BANNER ══════════════════ */}
+      <div style={{
+        width: '100%', borderRadius: 'var(--r-xl)', overflow: 'hidden',
+        margin: '14px 0 20px', position: 'relative',
+        border: '1px solid var(--brd)',
+        background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
+        minHeight: 160,
+      }}>
+        <img
+          src="./public/banner-acervo.png"
+          alt=""
+          onError={e => { e.target.style.display = 'none'; }}
+          style={{ position: 'absolute', inset: 0, zIndex: 1, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 2,
+          background: 'linear-gradient(135deg, rgba(4,7,13,0.82), rgba(4,7,13,0.45))',
+        }} />
+        <div style={{
+          position: 'relative', zIndex: 3, padding: '28px 28px 22px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.12em',
+              marginBottom: 4,
+            }}>
+              — acervo
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontWeight: 800,
+              fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', color: '#fff',
+              lineHeight: 1.1, letterSpacing: '-0.02em',
+            }}>
+              Minha <span style={{ color: 'var(--acc)' }}>Biblioteca</span>
+            </div>
+          </div>
+
+          {/* Stats inline */}
+          <div style={{
+            display: 'flex', gap: 16,
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.5)',
+          }}>
+            <span><strong style={{ color: 'var(--acc)' }}>{references?.length || 0}</strong> refs</span>
+            <span><strong style={{ color: 'var(--green)' }}>{references?.filter(r => r.isRead).length || 0}</strong> lidos</span>
+            <span><strong style={{ color: '#F0AD4E' }}>{references?.filter(r => r.isFavorite).length || 0}</strong> favoritos</span>
+            <span><strong style={{ color: 'var(--tx2)' }}>{references?.filter(r => r.filePath).length || 0}</strong> c/ arquivo</span>
+          </div>
+
+          {/* Search inside hero */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 'var(--r-md)', padding: '8px 14px', maxWidth: 480,
+            backdropFilter: 'blur(8px)',
+          }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--acc)', fontWeight: 600 }}>›_</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="buscar por título, autor, tag..."
+              style={{
+                border: 'none', background: 'none', outline: 'none', flex: 1,
+                fontFamily: 'var(--font-mono)', fontSize: 13, color: '#fff',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* ── Breadcrumb ── */}
       {currentFolderObj && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, margin: '12px 0 10px',
+          display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 12px',
           fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)',
         }}>
           <button onClick={() => setCurrentFolder(null)} style={{
@@ -336,22 +407,26 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ── Top bar ── */}
-      <div style={{ display: 'flex', gap: 8, margin: '15px 0 15px', alignItems: 'center' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, flex: 1,
-          background: 'var(--bg2)', border: '1px solid var(--brd)',
-          borderRadius: 'var(--r-md)', padding: '7px 12px'
-        }}>
-          <MagnifyingGlass size={14} color="var(--tx3)" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="buscar no acervo..."
-            style={{
-              border: 'none', background: 'none', outline: 'none', flex: 1,
-              fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--tx)'
-            }} />
+      {/* ══════════════════ TOOLBAR ══════════════════ */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        marginBottom: 14, flexWrap: 'wrap',
+      }}>
+        {/* Filter tabs */}
+        <div style={{ display: 'flex', gap: 2, flex: 1, flexWrap: 'wrap' }}>
+          {FILTERS.map((f) => (
+            <button key={f} onClick={() => setActiveFilter(f)} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
+              padding: '5px 12px', cursor: 'pointer',
+              borderRadius: 'var(--r-sm)',
+              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid transparent',
+              background: activeFilter === f ? 'var(--acc-bg)' : 'transparent',
+              color: activeFilter === f ? 'var(--acc)' : 'var(--tx3)',
+              transition: 'all 0.18s',
+            }}>
+              // {f.toUpperCase()}
+            </button>
+          ))}
         </div>
 
         {/* View toggle */}
@@ -359,9 +434,9 @@ export function Acervo({ profileId }) {
           display: 'flex', background: 'var(--bg2)', border: '1px solid var(--brd)',
           borderRadius: 'var(--r-md)', overflow: 'hidden',
         }}>
-          {[['grid', <SquaresFour size={15} />], ['list', <Rows size={15} />]].map(([v, icon]) => (
+          {[['grid', <SquaresFour size={14} />], ['list', <Rows size={14} />]].map(([v, icon]) => (
             <button key={v} onClick={() => setView(v)} style={{
-              padding: '7px 10px', border: 'none', cursor: 'pointer',
+              padding: '6px 9px', border: 'none', cursor: 'pointer',
               background: view === v ? 'var(--bg4)' : 'transparent',
               color: view === v ? 'var(--tx)' : 'var(--tx3)',
               display: 'flex', alignItems: 'center', transition: 'all 0.13s',
@@ -371,42 +446,26 @@ export function Acervo({ profileId }) {
           ))}
         </div>
 
-        {/* Nova pasta — só na raiz */}
         {!currentFolder && (
           <button onClick={() => setNewFolderOpen(true)} title="nova pasta" style={{
-            display: 'flex', alignItems: 'center', gap: 5,
+            display: 'flex', alignItems: 'center',
             background: 'var(--bg2)', border: '1px solid var(--brd)',
-            borderRadius: 'var(--r-md)', padding: '7px 10px', cursor: 'pointer',
+            borderRadius: 'var(--r-md)', padding: '6px 9px', cursor: 'pointer',
             color: 'var(--tx3)',
           }}>
-            <FolderPlus size={16} />
+            <FolderPlus size={15} />
           </button>
         )}
 
         <button onClick={() => setAddOpen(true)} style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--acc)', color: 'var(--bg0)', border: '1px solid var(--acc)',
-          borderRadius: 'var(--r-md)', padding: '0 14px', cursor: 'pointer',
-          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, height: 36,
+          display: 'flex', alignItems: 'center', gap: 5,
+          background: 'var(--acc)', color: 'var(--bg0)', border: 'none',
+          borderRadius: 'var(--r-md)', padding: '0 13px', cursor: 'pointer',
+          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, height: 33,
+          letterSpacing: '0.03em',
         }}>
-          <Plus size={16} weight="bold" /> Adicionar
+          <Plus size={14} weight="bold" /> ADICIONAR
         </button>
-      </div>
-
-      {/* ── Filter chips ── */}
-      <div style={{ display: 'flex', gap: 4, margin: '0 0 12px', flexWrap: 'wrap' }}>
-        {FILTERS.map((f) => (
-          <button key={f} onClick={() => setActiveFilter(f)} style={{
-            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
-            padding: '4px 10px', borderRadius: 3, cursor: 'pointer',
-            border: `1px solid ${activeFilter === f ? 'var(--acc)' : 'var(--brd)'}`,
-            background: activeFilter === f ? 'var(--acc)' : 'transparent',
-            color: activeFilter === f ? 'var(--bg0)' : 'var(--tx2)',
-            transition: 'all 0.18s'
-          }}>
-            {f}
-          </button>
-        ))}
       </div>
 
       {/* ── Pastas (só na raiz) ── */}
@@ -434,13 +493,13 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ── Referências ── */}
+      {/* ══════════════════ CARDS ══════════════════ */}
       {filtered.length > 0 ? (
         <div style={{
           display: view === 'grid' ? 'grid' : 'flex',
-          gridTemplateColumns: view === 'grid' ? 'repeat(3, 1fr)' : undefined,
+          gridTemplateColumns: view === 'grid' ? 'repeat(auto-fill, minmax(280px, 1fr))' : undefined,
           flexDirection: view === 'list' ? 'column' : undefined,
-          gap: 8,
+          gap: view === 'grid' ? 12 : 6,
         }}>
           {filtered.map((ref) => (
             <ReferenceCard
@@ -458,12 +517,11 @@ export function Acervo({ profileId }) {
         </div>
       ) : isEmpty ? (
         <div style={{
-          textAlign: 'center', padding: '40px 20px',
-          color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 15
+          textAlign: 'center', padding: '48px 20px',
+          color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 14,
         }}>
-          {currentFolder
-            ? 'pasta vazia — arraste referências aqui'
-            : 'nenhum item encontrado'}
+          <BookmarkSimple size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
+          <div>{currentFolder ? 'pasta vazia — arraste referências aqui' : 'nenhum item encontrado'}</div>
         </div>
       ) : null}
 
@@ -942,7 +1000,7 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
     </div>
   );
 
-  // ── GRID ────────────────────────────────────
+  // ── GRID (estilo livraria) ────────────────────────────────────
   return (
     <div
       draggable
@@ -955,154 +1013,186 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
       style={{
         background: 'var(--bg2)',
         border: `1px solid ${dragOver ? 'var(--acc)' : hover ? 'var(--brd2)' : 'var(--brd)'}`,
-        borderRadius: 'var(--r-md)', padding: 12, cursor: 'default',
-        transition: 'all 0.2s', position: 'relative',
-        boxShadow: hover ? '0 2px 12px rgba(0,0,0,0.25)' : 'none',
+        borderRadius: 'var(--r-lg)', cursor: 'default',
+        transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+        boxShadow: hover ? '0 4px 20px rgba(0,0,0,0.3)' : 'none',
+        display: 'flex', flexDirection: 'column',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+      {/* Cover / preview area */}
+      <div style={{
+        height: 100, background: `linear-gradient(135deg, var(--bg3), var(--bg4))`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', borderBottom: '1px solid var(--brd)',
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800,
+          color: 'var(--acc)', opacity: 0.15, letterSpacing: '-0.03em',
+          textTransform: 'uppercase', userSelect: 'none',
+        }}>
+          {(reference.type || 'ref').toUpperCase()}
+        </div>
+        {/* Type badge */}
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-          color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.06em',
+          position: 'absolute', top: 8, left: 8,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+          color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em',
+          padding: '2px 7px', borderRadius: 2,
+          background: 'rgba(212,160,48,0.7)', backdropFilter: 'blur(4px)',
         }}>
           {typeLabels[reference.type] || reference.type}
         </span>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') && (
-            <button onClick={e => { e.stopPropagation(); onRead?.(); }} style={{
-              ...cardBtnStyle, background: 'rgba(212,160,48,0.1)', borderColor: 'rgba(212,160,48,0.3)', color: 'var(--acc)',
-            }} title="ler PDF">
-              <BookOpenText size={12} weight="fill" />
-            </button>
-          )}
-          <button onClick={toggleFavorite} style={cardBtnStyle} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'}>
-            <Star size={12} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onEdit?.(); }} style={cardBtnStyle} title="editar metadados">
-            <PencilSimple size={12} />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onShare(); }} style={cardBtnStyle} title="compartilhar link">
-            <ShareNetwork size={12} />
-          </button>
-          {folders.length > 0 && (
-            <div style={{ position: 'relative' }}>
-              <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} style={cardBtnStyle} title="pasta">
-                <Folder size={12} />
-              </button>
-              {folderMenuOpen && (
-                <FolderPicker folders={folders} onPick={fId => { onAddToFolder(reference.id, fId); setFolderMenuOpen(false); }} />
-              )}
-            </div>
-          )}
-          <button onClick={handleDelete} title={confirmDelete ? 'confirmar' : 'excluir'} style={{
-            ...cardBtnStyle,
-            color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.45)',
-            borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
+        {/* Favorite star */}
+        {reference.isFavorite && (
+          <Star size={14} weight="fill" color="var(--acc)" style={{ position: 'absolute', top: 8, right: 8 }} />
+        )}
+        {/* Read status */}
+        {reference.isRead && (
+          <span style={{
+            position: 'absolute', bottom: 6, right: 8,
+            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+            color: 'var(--green)', background: 'var(--green-bg)',
+            border: '1px solid rgba(74,222,128,0.2)', padding: '1px 6px', borderRadius: 2,
           }}>
-            {busy ? <Spinner size={12} className="animate-spin" /> : <Trash size={12} />}
-          </button>
-        </div>
-      </div>
-
-      <div style={{
-        fontFamily: 'var(--font-display)', fontWeight: 600,
-        fontSize: 13, lineHeight: 1.35, marginBottom: 4, color: 'var(--tx)',
-      }}>
-        {reference.title}
-      </div>
-
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)', marginBottom: 6 }}>
-        {[reference.authors, reference.venue, reference.year].filter(Boolean).join(' · ')}
-      </div>
-
-      {(reference.tags || []).length > 0 && (
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-          {reference.tags.map((tag) => (
-            <span key={tag} style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11,
-              padding: '1px 6px', borderRadius: 2,
-              background: 'var(--bg3)', color: 'var(--tx2)',
-              border: '1px solid var(--brd)'
-            }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {reference.personalNote && (
-        <div style={{
-          marginBottom: 6, fontSize: 12, color: 'var(--tx2)',
-          fontStyle: 'italic', lineHeight: 1.4,
-          borderLeft: '2px solid var(--brd2)', paddingLeft: 8,
-        }}>
-          {reference.personalNote}
-        </div>
-      )}
-
-      <div style={{
-        marginTop: 6, paddingTop: 8, borderTop: '1px solid var(--brd)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        minHeight: 24,
-      }}>
-        {busy ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)' }}>
-            <Spinner size={12} className="animate-spin" /> processando...
+            ✓ LIDO
           </span>
-        ) : reference.filePath ? (
-          <button
-            onClick={e => { e.stopPropagation(); handleDownload(); }}
-            title={reference.fileName}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
-              background: 'var(--bg3)', border: '1px solid var(--brd)',
-              borderRadius: 3, padding: '2px 6px', cursor: 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-              maxWidth: '70%',
-            }}
-          >
+        )}
+        {/* File type indicator */}
+        {reference.filePath && (
+          <span style={{
+            position: 'absolute', bottom: 6, left: 8,
+            display: 'flex', alignItems: 'center', gap: 3,
+            fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
+            background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 2,
+            backdropFilter: 'blur(4px)',
+          }}>
             {fileIcon(reference.fileType, reference.fileName)}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {formatFileType(reference.fileType, reference.fileName)}
-            </span>
-            {reference.fileSize && (
-              <span style={{ color: 'var(--tx3)', opacity: 0.6, flexShrink: 0 }}>
-                {formatFileSize(reference.fileSize)}
+            {reference.fileSize ? formatFileSize(reference.fileSize) : ''}
+          </span>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '12px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700,
+          fontSize: 14, lineHeight: 1.3, marginBottom: 4, color: 'var(--tx)',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {reference.title}
+        </div>
+
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginBottom: 6,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {reference.authors || '—'} {reference.year ? `· ${reference.year}` : ''}
+        </div>
+
+        {reference.personalNote && (
+          <div style={{
+            fontSize: 12, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
+            lineHeight: 1.4, marginBottom: 6,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden', fontStyle: 'italic', opacity: 0.8,
+          }}>
+            {reference.personalNote}
+          </div>
+        )}
+
+        {(reference.tags || []).length > 0 && (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
+            {reference.tags.slice(0, 4).map((tag) => (
+              <span key={tag} style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+                padding: '1px 6px', borderRadius: 2,
+                background: 'var(--acc-bg)', color: 'var(--acc)',
+                border: '1px solid rgba(212,160,48,0.15)',
+              }}>
+                {tag}
+              </span>
+            ))}
+            {reference.tags.length > 4 && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)' }}>
+                +{reference.tags.length - 4}
               </span>
             )}
-          </button>
-        ) : reference.url ? (
-          <a
-            href={reference.url} target="_blank" rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
-              background: 'var(--bg3)', border: '1px solid var(--brd)',
-              borderRadius: 3, padding: '2px 6px', textDecoration: 'none',
-              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-              maxWidth: '70%',
-            }}
-          >
-            <LinkSimple size={11} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {hostnameOf(reference.url)}
-            </span>
-          </a>
-        ) : (
-          <button
-            onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5, background: 'none',
-              border: 'none', cursor: 'pointer', padding: 0, color: 'var(--tx3)',
-              fontFamily: 'var(--font-mono)', fontSize: 11,
-            }}
-          >
-            <Paperclip size={13} />
-            {dragOver ? 'solte aqui' : 'anexar arquivo'}
-          </button>
+          </div>
         )}
-        <input ref={fileInputRef} type="file" onChange={e => handleFile(e.target.files?.[0])} style={{ display: 'none' }} />
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Action bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          paddingTop: 8, borderTop: '1px solid var(--brd)', marginTop: 4,
+        }}>
+          {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') ? (
+            <button onClick={e => { e.stopPropagation(); onRead?.(); }} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--acc)', background: 'var(--acc-bg)',
+              border: '1px solid rgba(212,160,48,0.25)',
+              padding: '4px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+            }}>
+              <BookOpenText size={12} weight="fill" /> Ler
+            </button>
+          ) : reference.url ? (
+            <a href={reference.url} target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
+                textDecoration: 'none',
+              }}>
+              <LinkSimple size={11} /> {hostnameOf(reference.url)}
+            </a>
+          ) : (
+            <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
+            }}>
+              <Paperclip size={11} /> {dragOver ? 'solte aqui' : 'anexar'}
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 2 }}>
+            <button onClick={toggleFavorite} style={cardBtnStyle} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'}>
+              <Star size={11} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} style={cardBtnStyle} title="editar">
+              <PencilSimple size={11} />
+            </button>
+            {reference.filePath && (
+              <button onClick={e => { e.stopPropagation(); handleDownload(); }} style={cardBtnStyle} title="baixar">
+                <DownloadSimple size={11} />
+              </button>
+            )}
+            <button onClick={e => { e.stopPropagation(); onShare(); }} style={cardBtnStyle} title="compartilhar">
+              <ShareNetwork size={11} />
+            </button>
+            {folders.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} style={cardBtnStyle} title="pasta">
+                  <Folder size={11} />
+                </button>
+                {folderMenuOpen && (
+                  <FolderPicker folders={folders} onPick={fId => { onAddToFolder(reference.id, fId); setFolderMenuOpen(false); }} />
+                )}
+              </div>
+            )}
+            <button onClick={handleDelete} title={confirmDelete ? 'confirmar' : 'excluir'} style={{
+              ...cardBtnStyle,
+              color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.35)',
+              borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
+            }}>
+              {busy ? <Spinner size={11} className="animate-spin" /> : <Trash size={11} />}
+            </button>
+          </div>
+        </div>
       </div>
+      <input ref={fileInputRef} type="file" onChange={e => handleFile(e.target.files?.[0])} style={{ display: 'none' }} />
     </div>
   );
 }
