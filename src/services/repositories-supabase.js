@@ -49,13 +49,24 @@ async function queryOne(fn) {
   return data ? toCamel(data) : null;
 }
 
+/** Guard: skip query if id is falsy */
+function guardId(id) {
+  if (!id || id === 'undefined') {
+    console.warn('[summa] skipped query — missing ID');
+    return false;
+  }
+  return true;
+}
+
 // ── Profile ────────────────────────────────────────────────────
 export const ProfileRepo = {
   getActive: () =>
     queryOne(supabase.from('profiles').select('*').limit(1).single()),
 
-  getById: (id) =>
-    queryOne(supabase.from('profiles').select('*').eq('id', id).single()),
+  getById: (id) => {
+    if (!guardId(id)) return Promise.resolve(null);
+    return queryOne(supabase.from('profiles').select('*').eq('id', id).single());
+  },
 
   getByUserId: (userId) =>
     queryOne(supabase.from('profiles').select('*').eq('user_id', userId).single()),
@@ -151,8 +162,10 @@ export const DocumentRepo = {
   getAll: (profileId) =>
     query(supabase.from('documents').select('*').eq('profile_id', profileId).order('updated_at', { ascending: false })),
 
-  getById: (id) =>
-    queryOne(supabase.from('documents').select('*').eq('id', id).single()),
+  getById: (id) => {
+    if (!guardId(id)) return Promise.resolve(null);
+    return queryOne(supabase.from('documents').select('*').eq('id', id).single());
+  },
 
   getByStatus: (profileId, status) =>
     query(supabase.from('documents').select('*').eq('profile_id', profileId).eq('status', status)),
@@ -165,8 +178,17 @@ export const DocumentRepo = {
     ),
 
   create: async (data) => {
+    // Only send columns that exist in the documents table
+    const known = [
+      'profileId', 'folderId', 'title', 'type', 'template', 'status',
+      'content', 'contentHtml', 'tags', 'sourceTemplateId', 'sourceTemplateName',
+      'createdAt', 'updatedAt', 'wordCount', 'abstract',
+    ];
+    const filtered = Object.fromEntries(
+      Object.entries(data).filter(([k]) => known.includes(k))
+    );
     const row = await queryOne(
-      supabase.from('documents').insert(toSnake({ folderId: null, ...data })).select().single()
+      supabase.from('documents').insert(toSnake({ folderId: null, ...filtered })).select().single()
     );
     return row?.id;
   },
@@ -259,6 +281,48 @@ export const ReferenceRepo = {
 
   delete: (id) =>
     supabase.from('references').delete().eq('id', id),
+};
+
+// ── Reference Folders (Acervo) ─────────────────────────────
+export const ReferenceFolderRepo = {
+  getAll: (profileId) =>
+    query(
+      supabase
+        .from('reference_folders')
+        .select('*, reference_folder_items(reference_id)')
+        .eq('profile_id', profileId)
+        .order('position')
+    ),
+  create: async (profileId, { name, color, description, isProject, image, position = 0 }) => {
+    const row = await queryOne(
+      supabase.from('reference_folders').insert({
+        profile_id: profileId,
+        name: name.trim(),
+        color: color ?? null,
+        description: description ?? '',
+        is_project: isProject ?? false,
+        image: image ?? null,
+        position,
+      }).select().single()
+    );
+    return row?.id;
+  },
+  update: (id, data) =>
+    supabase.from('reference_folders').update(toSnake(data)).eq('id', id),
+  delete: (id) =>
+    supabase.from('reference_folders').delete().eq('id', id),
+  addRef: async (folderId, referenceId) => {
+    // UNIQUE constraint ignora duplicata silenciosamente
+    await supabase.from('reference_folder_items').upsert(
+      { folder_id: folderId, reference_id: referenceId },
+      { onConflict: 'folder_id,reference_id', ignoreDuplicates: true }
+    );
+  },
+  removeRef: (folderId, referenceId) =>
+    supabase.from('reference_folder_items')
+      .delete()
+      .eq('folder_id', folderId)
+      .eq('reference_id', referenceId),
 };
 
 // ── Document ↔ Reference (vínculo citação) ─────────────────────
@@ -571,8 +635,10 @@ export const AnalysisRunRepo = {
 
 // ── AI Suggestions ─────────────────────────────────────────────
 export const AiSuggestionRepo = {
-  getForDocument: (documentId) =>
-    query(supabase.from('ai_suggestions').select('*').eq('document_id', documentId).eq('is_dismissed', false)),
+  getForDocument: (documentId) => {
+    if (!guardId(documentId)) return Promise.resolve(null);
+    return query(supabase.from('ai_suggestions').select('*').eq('document_id', documentId).eq('is_dismissed', false));
+  },
 
   create: async (data) => {
     const row = await queryOne(

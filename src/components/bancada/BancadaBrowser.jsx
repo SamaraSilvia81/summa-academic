@@ -730,7 +730,6 @@ function NewDocumentModal({ onClose, onConfirm }) {
   const [step, setStep] = useState(0);
   const [family, setFamily] = useState(null);
   const [templateItem, setTemplateItem] = useState(null);
-  const [previewItem, setPreviewItem] = useState(null);
   const [title, setTitle] = useState('');
 
   const group = family && family !== 'livre' ? TEMPLATE_CATALOG[family] : null;
@@ -874,19 +873,17 @@ function NewDocumentModal({ onClose, onConfirm }) {
                   <CaretRight size={12} />
                 </button>
                 {group.items.map(item => {
-                  const isSelected = previewItem?.id === item.id;
                   return (
                     <div
                       key={item.id}
-                      onClick={() => setPreviewItem(isSelected ? null : item)}
                       style={{
-                        background: isSelected ? `${group.color}08` : 'var(--bg2)',
-                        border: `1px solid ${isSelected ? group.color : 'var(--brd)'}`,
+                        background: 'var(--bg2)',
+                        border: `1px solid var(--brd)`,
                         borderRadius: 'var(--r-md)', overflow: 'hidden',
-                        cursor: 'pointer', transition: 'border-color 0.15s',
+                        transition: 'border-color 0.15s',
                       }}
-                      onMouseEnter={e => !isSelected && (e.currentTarget.style.borderColor = `${group.color}66`)}
-                      onMouseLeave={e => !isSelected && (e.currentTarget.style.borderColor = 'var(--brd)')}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = `${group.color}66`}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--brd)'}
                     >
                       {/* Info row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', gap: 10 }}>
@@ -899,22 +896,20 @@ function NewDocumentModal({ onClose, onConfirm }) {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {isSelected && (
-                            <button
-                              onClick={e => { e.stopPropagation(); pickTemplate(item); }}
-                              style={{
-                                padding: '5px 12px', background: group.color, color: 'var(--bg0)',
-                                border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer',
-                                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
-                              }}
-                            >
-                              usar este
-                            </button>
-                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); pickTemplate(item); }}
+                            style={{
+                              padding: '5px 12px', background: group.color, color: 'var(--bg0)',
+                              border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                            }}
+                          >
+                            usar este
+                          </button>
                         </div>
                       </div>
-                      {/* Preview expandido */}
-                      {isSelected && item.previewImg && (
+                      {/* Preview sempre visível */}
+                      {item.previewImg && (
                         <div style={{
                           borderTop: `1px solid ${group.color}33`,
                           background: '#fff', padding: 12,
@@ -924,15 +919,14 @@ function NewDocumentModal({ onClose, onConfirm }) {
                             src={item.previewImg}
                             alt={`Preview: ${item.name}`}
                             style={{
-                              maxWidth: '100%', maxHeight: 420,
+                              maxWidth: '100%', maxHeight: 320,
                               borderRadius: 4, border: '1px solid #e0e0e0',
                               boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                             }}
                           />
                         </div>
                       )}
-                      {/* SVG fallback quando não tem imagem */}
-                      {isSelected && !item.previewImg && (
+                      {!item.previewImg && (
                         <div style={{
                           borderTop: `1px solid ${group.color}33`,
                           background: '#fff', padding: 12,

@@ -13,7 +13,7 @@
 .left {
   @apply relative flex min-h-screen flex-1 items-end bg-[#ebe4d6] bg-cover bg-no-repeat;
   flex-basis: 46%;
-  background-image: url('/imagem.jpg');
+  background-image: url('/imagem.png');
   background-position: center 42%;
 }
 

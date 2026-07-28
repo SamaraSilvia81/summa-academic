@@ -2,11 +2,11 @@ import {
   ArrowLeft, FloppyDisk, FileText,
   TextB, TextItalic, TextStrikethrough,
   TextHOne, TextHTwo, TextHThree,
-  ListBullets, Code, Quotes
+  ListBullets, Code, Quotes, Eye, EyeSlash
 } from '@phosphor-icons/react';
 import styles from './EditorToolbar.module.css';
 
-export function EditorToolbar({ editor, doc, saveStatus, onBack, onSave, onExportLatex }) {
+export function EditorToolbar({ editor, doc, saveStatus, onBack, onSave, onExportLatex, previewOpen, onTogglePreview }) {
   if (!editor) return null;
 
   const wordCount = editor.getText().split(/\s+/).filter(Boolean).length;
@@ -72,6 +72,15 @@ export function EditorToolbar({ editor, doc, saveStatus, onBack, onSave, onExpor
         <span className={styles.statusBadge} style={{ color: statusColor, background: `${statusColor}15` }}>
           {statusLabel}
         </span>
+
+        <button
+          className={`${styles.previewBtn} ${previewOpen ? styles.previewBtnActive : ''}`}
+          onClick={onTogglePreview}
+          title={previewOpen ? 'fechar preview' : 'preview do template'}
+        >
+          {previewOpen ? <EyeSlash size={14} /> : <Eye size={14} />}
+          preview
+        </button>
 
         <button className={styles.saveBtn} onClick={onSave}>
           <FloppyDisk size={14} />salvar

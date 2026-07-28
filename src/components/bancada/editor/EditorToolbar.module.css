@@ -136,3 +136,31 @@
   background: var(--bg4);
   color: var(--tx);
 }
+
+.previewBtn {
+  background: var(--bg3);
+  border: 1px solid var(--brd);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--tx2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.previewBtn:hover {
+  background: var(--bg4);
+  color: var(--tx);
+}
+.previewBtnActive {
+  background: var(--acc-bg);
+  border-color: var(--acc);
+  color: var(--acc);
+}
+.previewBtnActive:hover {
+  background: var(--acc-bg);
+  color: var(--acc);
+}

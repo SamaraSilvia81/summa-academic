@@ -9,6 +9,7 @@ import { DocumentRepo } from '../../../services/repositories';
 import { convertToLatex } from '../../../services/tiptap-to-latex';
 import { EditorToolbar } from './EditorToolbar';
 import { RefsSidebar } from './RefsSidebar';
+import { TemplatePreview } from './TemplatePreview';
 import styles from './EditorPage.module.css';
 
 export function EditorPage({ profileId }) {
@@ -18,7 +19,9 @@ export function EditorPage({ profileId }) {
   const allRefs = useReferences(profileId) ?? [];
   const aiSuggestions = useAiSuggestions(docId || null);
   const [activeDoc, setActiveDoc] = useState(null);
-  const [saveStatus, setSaveStatus] = useState('salvo âœ“');
+  const [saveStatus, setSaveStatus] = useState('salvo ✓');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [editorJson, setEditorJson] = useState(null);
 
   // Load doc
   useEffect(() => {
@@ -39,7 +42,10 @@ export function EditorPage({ profileId }) {
       Placeholder.configure({ placeholder: 'Comece a escrever...' }),
     ],
     content: activeDoc?.content || '',
-    onUpdate: () => setSaveStatus('editando...'),
+    onUpdate: ({ editor: ed }) => {
+      setSaveStatus('editando...');
+      setEditorJson(ed.getJSON());
+    },
     editorProps: {
       attributes: { class: styles.proseMirror },
     },
@@ -57,7 +63,7 @@ export function EditorPage({ profileId }) {
         try {
           const wc = editor.getText().split(/\s+/).filter(Boolean).length;
           await DocumentRepo.update(activeDoc.id, { content: json, wordCount: wc });
-          setSaveStatus('salvo âœ“');
+          setSaveStatus('salvo ✓');
           setActiveDoc(prev => prev ? { ...prev, content: json } : null);
         } catch (err) {
           console.error('auto-save falhou:', err);
@@ -75,7 +81,7 @@ export function EditorPage({ profileId }) {
       const json = editor.getJSON();
       const wc = editor.getText().split(/\s+/).filter(Boolean).length;
       await DocumentRepo.update(activeDoc.id, { content: json, wordCount: wc });
-      setSaveStatus('salvo âœ“');
+      setSaveStatus('salvo ✓');
       setActiveDoc(prev => prev ? { ...prev, content: json } : null);
     } catch (err) {
       console.error('salvar falhou:', err);
@@ -110,7 +116,7 @@ export function EditorPage({ profileId }) {
     .slice(0, 6)
     .map(r => ({
       title: `${r.authors?.split(',')[0] ?? 'Autor'} (${r.year})`,
-      meta: `${r.venue} Â· ${r.type.replace('_', ' ')}`,
+      meta: `${r.venue} · ${r.type.replace('_', ' ')}`,
       read: r.isRead,
     }));
 
@@ -123,6 +129,8 @@ export function EditorPage({ profileId }) {
         onBack={() => navigate('/bancada')}
         onSave={handleSave}
         onExportLatex={handleExportLatex}
+        previewOpen={previewOpen}
+        onTogglePreview={() => setPreviewOpen(p => !p)}
       />
 
       <div className={styles.body}>
@@ -130,7 +138,16 @@ export function EditorPage({ profileId }) {
           <EditorContent editor={editor} />
         </div>
 
-        <RefsSidebar refs={refs} aiSuggestions={aiSuggestions} />
+        {previewOpen ? (
+          <TemplatePreview
+            json={editorJson ?? editor?.getJSON() ?? null}
+            template={activeDoc?.template || 'free'}
+            docTitle={activeDoc?.title || ''}
+            author="Sabino, S.S."
+          />
+        ) : (
+          <RefsSidebar refs={refs} aiSuggestions={aiSuggestions} />
+        )}
       </div>
     </div>
   );

@@ -25,6 +25,18 @@ export function Farol({ profileId }) {
         position: 'relative', border: '1px solid var(--brd)',
         background: 'linear-gradient(135deg, var(--bg2), var(--bg3))'
       }}>
+        <img 
+          src="./public/banner-farol.png" 
+          alt="Banner de boas-vindas"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 1, // menor que o overlay (que é 3)
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover' // ou 'contain'
+          }}
+        />
         <div style={{
           position: 'absolute', inset: 0, zIndex: 3,
           display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
@@ -41,7 +53,7 @@ export function Farol({ profileId }) {
             fontFamily: 'var(--font-mono)', fontSize: 14,
             color: 'rgba(255,255,255,0.5)', marginTop: 2
           }}>
-            {formatDate(new Date())} Â· semana {getWeekNumber()}
+            {formatDate(new Date())} · semana {getWeekNumber()}
           </div>
         </div>
         <div style={{
@@ -102,7 +114,7 @@ export function Farol({ profileId }) {
       {/* CFPs */}
       {cfps && cfps.length > 0 &&
       <>
-          <SectionHeader title="oportunidades" linkText="ver todas â†’" />
+          <SectionHeader title="oportunidades" linkText="ver todas →" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {cfps.map((item) =>
           <RadarCard key={item.id} item={item} profileId={profileId} />
@@ -114,7 +126,7 @@ export function Farol({ profileId }) {
       {/* NPs */}
       {notes && notes.length > 0 &&
       <>
-          <SectionHeader title="notas de pesquisa" linkText="todas â†’" />
+          <SectionHeader title="notas de pesquisa" linkText="todas →" />
           {notes.slice(0, 3).map((note) =>
         <NoteCard key={note.id} note={note} />
         )}
@@ -207,7 +219,7 @@ function RadarCard({ item, profileId }) {
         textTransform: 'uppercase', letterSpacing: '0.04em',
         color: 'var(--tx3)', marginBottom: 6
       }}>
-        {item.source} {item.type === 'cfp' && item.deadline ? `Â· deadline: ${item.deadline}` : ''}
+        {item.source} {item.type === 'cfp' && item.deadline ? `· deadline: ${item.deadline}` : ''}
       </div>
       <div style={{
         fontFamily: 'var(--font-display)', fontWeight: 600,

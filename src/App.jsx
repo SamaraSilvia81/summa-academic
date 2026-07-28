@@ -29,9 +29,11 @@ export default function App() {
   const dispatch = useDispatch();
   const { profile, user, status: authStatus } = useSelector(selectAuth);
   const [phase, setPhase] = useState('splash');
+  const [globalSearch, setGlobalSearch] = useState('');
   const settings = useSettings(profile?.id);
   const location = useLocation();
   const authReady = authStatus === 'ready' || authStatus === 'failed';
+  const currentView = location.pathname.split('/')[1] || 'farol';
 
   useEffect(() => {
     dispatch(initializeAuth());
@@ -90,9 +92,6 @@ export default function App() {
   if (phase === 'onboarding') return <Onboarding onComplete={() => setPhase('loading')} />;
   if (!user) return <AuthScreen onDone={() => setPhase('loading')} />;
   if (!profile) return <Onboarding onComplete={() => setPhase('loading')} />;
-
-  const currentView = location.pathname.split('/')[1] || 'farol';
-  const [globalSearch, setGlobalSearch] = useState('');
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>

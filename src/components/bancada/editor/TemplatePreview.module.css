@@ -1,0 +1,324 @@
+/* ─── Preview Container ─────────────────────────────── */
+.previewContainer {
+  width: 380px;
+  min-width: 380px;
+  border-left: 1px solid var(--brd);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg1);
+  overflow: hidden;
+}
+
+.previewLabel {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--brd);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--tx2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.labelDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Page Scroller ─────────────────────────────────── */
+.pageScroller {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ─── Paper Page (base) ─────────────────────────────── */
+.page {
+  background: #fff;
+  color: #111;
+  width: 100%;
+  max-width: 340px;
+  min-height: 480px;
+  padding: 28px 24px 32px;
+  border-radius: 3px;
+  box-shadow:
+    0 1px 4px rgba(0,0,0,0.18),
+    0 0 0 1px rgba(0,0,0,0.06);
+  font-family: 'Times New Roman', 'Noto Serif', Georgia, serif;
+  font-size: 7.5px;
+  line-height: 1.35;
+  position: relative;
+  align-self: flex-start;
+}
+
+/* ─── Paper header ──────────────────────────────────── */
+.paperHeader {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.ieeeConferenceTag {
+  font-size: 6.5px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 0.5px solid #ccc;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.acmConferenceTag {
+  font-size: 6.5px;
+  color: #555;
+  letter-spacing: 0.03em;
+  border-bottom: 0.5px solid #ccc;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+/* ─── Title & Author ────────────────────────────────── */
+.paperTitle {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 6px;
+  line-height: 1.25;
+  font-family: 'Times New Roman', 'Noto Serif', Georgia, serif;
+  color: #000;
+}
+
+.paperAuthor {
+  text-align: center;
+  font-size: 8px;
+  color: #333;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.paperInstitution {
+  font-size: 7px;
+  color: #555;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* ─── Body ──────────────────────────────────────────── */
+.paperBody {
+  text-align: justify;
+  hyphens: auto;
+  word-break: break-word;
+}
+
+.emptyHint {
+  text-align: center;
+  color: #aaa;
+  font-style: italic;
+  font-size: 8px;
+  padding: 24px 12px;
+  font-family: -apple-system, sans-serif;
+}
+
+/* ─── Section Headings ──────────────────────────────── */
+.sectionHeading {
+  font-size: 9px;
+  font-weight: 700;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  line-height: 1.3;
+  font-family: 'Times New Roman', 'Noto Serif', Georgia, serif;
+  color: #000;
+}
+
+/* IEEE: small-caps centered */
+.sectionHeading[data-template="ieee"] {
+  text-align: center;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+}
+
+/* ACM: left-aligned bold */
+.sectionHeading[data-template="acm"] {
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* SBC: left-aligned bold, slightly bigger */
+.sectionHeading[data-template="sbc"] {
+  text-align: left;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.subsectionHeading {
+  font-size: 8px;
+  font-weight: 600;
+  font-style: italic;
+  margin-top: 8px;
+  margin-bottom: 3px;
+  line-height: 1.3;
+  color: #111;
+}
+
+.subsectionHeading[data-template="ieee"] {
+  text-align: left;
+  font-style: italic;
+  text-transform: none;
+  font-variant: normal;
+}
+
+.sectionNum {
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+/* ─── Paragraphs ────────────────────────────────────── */
+.bodyPara {
+  margin-bottom: 4px;
+  text-indent: 12px;
+}
+
+.emptyPara {
+  height: 4px;
+}
+
+/* ─── Lists ─────────────────────────────────────────── */
+.list {
+  padding-left: 16px;
+  margin: 4px 0;
+  font-size: 7.5px;
+}
+.list li {
+  margin-bottom: 1px;
+}
+
+/* ─── Code Block ────────────────────────────────────── */
+.codeBlock {
+  background: #f5f5f5;
+  border: 0.5px solid #ddd;
+  border-radius: 1px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 6.5px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.inlineCode {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 6.5px;
+  background: #eee;
+  padding: 0 2px;
+  border-radius: 1px;
+}
+
+/* ─── Blockquote ────────────────────────────────────── */
+.blockquote {
+  border-left: 1.5px solid #aaa;
+  padding-left: 8px;
+  margin: 6px 0;
+  color: #444;
+  font-style: italic;
+}
+
+/* ─── HR ────────────────────────────────────────────── */
+.hr {
+  border: none;
+  border-top: 0.5px solid #ccc;
+  margin: 8px 0;
+}
+
+/* ════════════════════════════════════════════════════════
+   TEMPLATE LAYOUTS
+   ════════════════════════════════════════════════════════ */
+
+/* ─── IEEE: Two-column ──────────────────────────────── */
+.layoutIeee .paperBody {
+  column-count: 2;
+  column-gap: 12px;
+  column-rule: none;
+}
+.layoutIeee .sectionHeading {
+  column-span: all;
+}
+.layoutIeee .paperTitle {
+  font-size: 15px;
+}
+.layoutIeee .codeBlock,
+.layoutIeee .blockquote {
+  break-inside: avoid;
+}
+
+/* ─── ACM: Two-column ───────────────────────────────── */
+.layoutAcm .paperBody {
+  column-count: 2;
+  column-gap: 12px;
+  column-rule: none;
+}
+.layoutAcm .sectionHeading {
+  column-span: all;
+}
+.layoutAcm .paperTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+.layoutAcm .paperAuthor {
+  font-size: 8.5px;
+}
+.layoutAcm .codeBlock,
+.layoutAcm .blockquote {
+  break-inside: avoid;
+}
+
+/* ─── SBC: Single-column ────────────────────────────── */
+.layoutSbc {
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+.layoutSbc .paperBody {
+  column-count: 1;
+}
+.layoutSbc .paperTitle {
+  font-size: 13px;
+}
+.layoutSbc .bodyPara {
+  text-indent: 0;
+  margin-bottom: 6px;
+}
+.layoutSbc .sectionHeading {
+  font-size: 10px;
+}
+
+/* ─── Livre: Single-column ──────────────────────────── */
+.layoutFree {
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+.layoutFree .paperBody {
+  column-count: 1;
+}
+.layoutFree .paperTitle {
+  font-size: 12px;
+}
+.layoutFree .bodyPara {
+  text-indent: 0;
+  margin-bottom: 6px;
+}
+.layoutFree .sectionHeading {
+  text-align: left;
+  font-size: 10px;
+  text-transform: none;
+  font-variant: normal;
+}

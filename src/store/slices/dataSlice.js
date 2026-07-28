@@ -9,6 +9,7 @@ import {
   SettingsRepo,
   TaskRepo,
 } from '../../services/repositories';
+import { uploadReferenceFile, deleteReferenceFile } from '../../lib/storage';
 
 const ALL = '__all__';
 const ROOT = '__root__';
@@ -79,6 +80,83 @@ export const toggleReferenceFavorite = createAsyncThunk(
   'data/toggleReferenceFavorite',
   async ({ profileId, reference }, { dispatch }) => {
     await ReferenceRepo.update(reference.id, { isFavorite: !reference.isFavorite });
+    await dispatch(loadReferences(profileId));
+    return reference.id;
+  },
+);
+
+/** Cria uma nova referência no acervo. `file` é opcional — se vier, sobe pro storage antes de criar a linha. */
+export const createReference = createAsyncThunk(
+  'data/createReference',
+  async ({ profileId, data, file = null }, { dispatch }) => {
+    let fileMeta = {};
+    if (file) {
+      fileMeta = await uploadReferenceFile(profileId, file);
+    }
+    const id = await ReferenceRepo.create({ profileId, ...data, ...fileMeta });
+    await dispatch(loadReferences(profileId));
+    return id;
+  },
+);
+
+/** Anexa (ou substitui) o arquivo de uma referência já existente. */
+export const attachReferenceFile = createAsyncThunk(
+  'data/attachReferenceFile',
+  async ({ profileId, reference, file }, { dispatch }) => {
+    if (reference.filePath) {
+      await deleteReferenceFile(reference.filePath);
+    }
+    const fileMeta = await uploadReferenceFile(profileId, file);
+    await ReferenceRepo.update(reference.id, fileMeta);
+    await dispatch(loadReferences(profileId));
+    return reference.id;
+  },
+);
+
+/** Remove só o arquivo de uma referência, mantendo o registro no catálogo. */
+export const removeReferenceFile = createAsyncThunk(
+  'data/removeReferenceFile',
+  async ({ profileId, reference }, { dispatch }) => {
+    if (reference.filePath) {
+      await deleteReferenceFile(reference.filePath);
+    }
+    await ReferenceRepo.update(reference.id, {
+      filePath: null, fileName: null, fileSize: null, fileType: null, fileUploadedAt: null,
+    });
+    await dispatch(loadReferences(profileId));
+    return reference.id;
+  },
+);
+
+/** Remove o link externo de uma referência, mantendo o registro no catálogo. */
+export const removeReferenceLink = createAsyncThunk(
+  'data/removeReferenceLink',
+  async ({ profileId, reference }, { dispatch }) => {
+    await ReferenceRepo.update(reference.id, { url: null });
+    await dispatch(loadReferences(profileId));
+    return reference.id;
+  },
+);
+
+/** Apaga a referência inteira (e o arquivo associado, se houver). */
+export const deleteReference = createAsyncThunk(
+  'data/deleteReference',
+  async ({ profileId, reference }, { dispatch }) => {
+    if (reference.filePath) {
+      await deleteReferenceFile(reference.filePath);
+    }
+    await ReferenceRepo.delete(reference.id);
+    await dispatch(loadReferences(profileId));
+    return reference.id;
+  },
+);
+
+/** Atualiza os metadados (título, autores, venue, ano, tipo, tags) de uma referência existente. */
+export const updateReference = createAsyncThunk(
+  'data/updateReference',
+  async ({ profileId, reference }, { dispatch }) => {
+    const { title, authors, venue, year, type, tags } = reference;
+    await ReferenceRepo.update(reference.id, { title, authors, venue, year, type, tags });
     await dispatch(loadReferences(profileId));
     return reference.id;
   },
