@@ -22,10 +22,6 @@ import {
 import { getReferenceFileUrl } from '../../lib/storage';
 import { ReferenceFolderRepo } from '../../services/repositories';
 
-// ─────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────
-
 const FILTERS = ['todos', 'papers', 'meus artigos', 'datasets', 'notas', 'favoritos'];
 
 const SORT_OPTIONS = [
@@ -46,10 +42,6 @@ const FOLDER_COLORS = [
   '#D4A030', '#60A5FA', '#A78BFA', '#F472B6',
   '#34D399', '#F87171', '#FB923C', '#8A8680',
 ];
-
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
 
 function formatFileSize(bytes) {
   if (!bytes && bytes !== 0) return '';
@@ -96,10 +88,6 @@ const inputStyle = {
   fontFamily: 'var(--font-mono)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
 };
 
-// ─────────────────────────────────────────────
-// Hook: pastas do Acervo (Supabase)
-// ─────────────────────────────────────────────
-
 function useReferenceFolders(profileId) {
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -110,7 +98,6 @@ function useReferenceFolders(profileId) {
     try {
       const data = await ReferenceFolderRepo.getAll(profileId);
       if (data) {
-        // Normaliza: reference_folder_items → refIds[]
         setFolders(data.map(f => ({
           ...f,
           refIds: (f.referenceFolderItems || []).map(i => i.referenceId),
@@ -161,10 +148,6 @@ function useReferenceFolders(profileId) {
   };
 }
 
-// ─────────────────────────────────────────────
-// Main Acervo
-// ─────────────────────────────────────────────
-
 export function Acervo({ profileId }) {
   const dispatch = useDispatch();
   const references = useReferences(profileId);
@@ -173,8 +156,8 @@ export function Acervo({ profileId }) {
     deleteFolder, addRefToFolder,
   } = useReferenceFolders(profileId);
 
-  const [activeTab, setActiveTab] = useState('referencias'); // 'referencias' | 'leitura'
-  const [readingRef, setReadingRef] = useState(null); // referência aberta pra leitura direta
+  const [activeTab, setActiveTab] = useState('referencias');
+  const [readingRef, setReadingRef] = useState(null);
   const [activeFilter, setActiveFilter] = useState('todos');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -183,24 +166,20 @@ export function Acervo({ profileId }) {
   const [filterHasFile, setFilterHasFile] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [view, setView] = useState('grid');
-  const [currentFolder, setCurrentFolder] = useState(null); // folder id ou null
+  const [currentFolder, setCurrentFolder] = useState(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [editFolderOpen, setEditFolderOpen] = useState(null); // folder id
+  const [editFolderOpen, setEditFolderOpen] = useState(null);
   const [editRefOpen, setEditRefOpen] = useState(null);
-  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null); // folder object
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null);
   const [deletingFolder, setDeletingFolder] = useState(false);
   const [toast, setToast] = useState('');
 
-  // ── Derived ────────────────────────────────
   const currentFolderObj = folders.find(f => f.id === currentFolder) || null;
 
-  // IDs de referências que estão em ALGUMA pasta
   const refsInAnyFolder = new Set(folders.flatMap(f => f.refIds || []));
 
-  // IDs de referências que estão na pasta atual
   const folderRefIds = currentFolderObj ? new Set(currentFolderObj.refIds || []) : null;
 
-  // Anos disponíveis (para o filtro de ano) e flag de filtros ativos
   const availableYears = Array.from(
     new Set((references || []).map((r) => r.year).filter(Boolean))
   ).sort((a, b) => b - a);
@@ -215,10 +194,8 @@ export function Acervo({ profileId }) {
 
   const filtered = (references || []).filter((ref) => {
     if (folderRefIds !== null) {
-      // Dentro de uma pasta: só o que está nela
       return folderRefIds.has(ref.id);
     } else {
-      // Raiz (Drive-style): só o que NÃO está em nenhuma pasta
       return !refsInAnyFolder.has(ref.id);
     }
   }).filter((ref) => {
@@ -246,9 +223,6 @@ export function Acervo({ profileId }) {
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 
-  // Na raiz, as pastas já são renderizadas acima independente de filtro/busca —
-  // então "nenhum item encontrado" só faz sentido se não há pastas E não há
-  // referências soltas. Dentro de uma pasta, o vazio é sempre real.
   const isEmpty = filtered.length === 0 && !(!currentFolder && folders.length > 0);
 
   function showToast(msg) {
@@ -274,7 +248,6 @@ export function Acervo({ profileId }) {
     try {
       const refIds = confirmDeleteFolder.refIds || [];
       const refsToDelete = (references || []).filter((r) => refIds.includes(r.id));
-      // Apaga de fato as referências que estavam dentro da pasta
       for (const ref of refsToDelete) {
         await dispatch(deleteReference({ profileId, reference: ref })).unwrap().catch(() => {});
       }
@@ -287,10 +260,8 @@ export function Acervo({ profileId }) {
     }
   }
 
-  // ─────────────────────────────────────────────
   return (
     <div className="animate-fade-in">
-      {/* ══════════════════ HERO BANNER ══════════════════ */}
       <div style={{
         width: '100%', borderRadius: 'var(--r-xl)', overflow: 'hidden',
         margin: '14px 0 20px', position: 'relative',
@@ -352,7 +323,6 @@ export function Acervo({ profileId }) {
             </div>
           </div>
 
-          {/* Stats inline */}
           <div style={{
             display: 'flex', gap: 16,
             fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.5)',
@@ -363,7 +333,6 @@ export function Acervo({ profileId }) {
             <span><strong style={{ color: 'var(--tx2)' }}>{references?.filter(r => r.filePath).length || 0}</strong> c/ arquivo</span>
           </div>
 
-          {/* Search inside hero */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
@@ -396,8 +365,6 @@ export function Acervo({ profileId }) {
 
       {activeTab === 'referencias' && (<>
 
-
-      {/* ── Breadcrumb ── */}
       {currentFolderObj && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 12px',
@@ -416,12 +383,10 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ══════════════════ TOOLBAR ══════════════════ */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         marginBottom: filtersOpen ? 10 : 14, flexWrap: 'wrap',
       }}>
-        {/* Filter tabs */}
         <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setActiveFilter(f)} style={{
@@ -438,7 +403,6 @@ export function Acervo({ profileId }) {
           ))}
         </div>
 
-        {/* Funnel: painel de filtros avançados */}
         <button onClick={() => setFiltersOpen(v => !v)} title="filtros" style={{
           display: 'flex', alignItems: 'center', gap: 5,
           background: filtersOpen ? 'var(--bg4)' : (hasActiveFilters ? 'var(--acc-bg)' : 'var(--bg2)'),
@@ -449,7 +413,6 @@ export function Acervo({ profileId }) {
           <Funnel size={14} weight={hasActiveFilters ? 'fill' : 'regular'} />
         </button>
 
-        {/* View toggle */}
         <div style={{
           display: 'flex', background: 'var(--bg2)', border: '1px solid var(--brd)',
           borderRadius: 'var(--r-md)', overflow: 'hidden',
@@ -488,7 +451,6 @@ export function Acervo({ profileId }) {
         </button>
       </div>
 
-      {/* ── Painel de filtros ── */}
       {filtersOpen && (
         <div style={{
           background: 'var(--bg1)', border: '1px solid var(--brd2)',
@@ -541,7 +503,6 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ── Pastas (só na raiz) ── */}
       {!currentFolder && folders.length > 0 && (
         <div style={{
           display: view === 'grid' ? 'grid' : 'flex',
@@ -565,7 +526,6 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ══════════════════ CARDS ══════════════════ */}
       {filtered.length > 0 ? (
         <div style={{
           display: view === 'grid' ? 'grid' : 'flex',
@@ -597,7 +557,6 @@ export function Acervo({ profileId }) {
         </div>
       ) : null}
 
-      {/* ── Toast ── */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
@@ -610,7 +569,6 @@ export function Acervo({ profileId }) {
         </div>
       )}
 
-      {/* ── Modals ── */}
       {addOpen && (
         <AddReferenceModal
           profileId={profileId}
@@ -664,10 +622,6 @@ export function Acervo({ profileId }) {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// DeleteFolderModal
-// ─────────────────────────────────────────────
 
 function DeleteFolderModal({ folder, count, deleting, onCancel, onConfirm }) {
   return (
@@ -725,10 +679,6 @@ function DeleteFolderModal({ folder, count, deleting, onCancel, onConfirm }) {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// FolderCard
-// ─────────────────────────────────────────────
 
 function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, onDropRef }) {
   const [hover, setHover] = useState(false);
@@ -788,16 +738,46 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
         background: 'var(--bg1)',
         border: `1px solid ${dragOver ? 'var(--acc)' : hover ? fc + '55' : 'var(--brd)'}`,
         borderRadius: 'var(--r-lg)', cursor: 'pointer', overflow: 'hidden',
-        transition: 'border-color 0.15s, box-shadow 0.15s', minHeight: 90,
+        transition: 'border-color 0.15s, box-shadow 0.15s', minHeight: 118,
         boxShadow: dragOver ? `0 0 0 2px ${fc}44` : hover ? `0 2px 16px ${fc}22` : 'none',
         display: 'flex', flexDirection: 'column',
       }}
     >
-      {folder.image
-        ? <div style={{ height: 56, background: `center/cover no-repeat url(${folder.image})`, flexShrink: 0 }} />
-        : <div style={{ height: 3, background: `linear-gradient(90deg,${fc},${fc}22)` }} />
-      }
-      <div style={{ padding: '12px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'relative', height: 46, flexShrink: 0 }}>
+        {folder.image ? (
+          <div style={{ position: 'absolute', inset: 0, background: `center/cover no-repeat url(${folder.image})` }} />
+        ) : (
+          <>
+            <div style={{
+              position: 'absolute', top: 0, left: 16, width: 46, height: 14,
+              background: fc, borderRadius: '3px 3px 0 0', opacity: 0.95,
+              clipPath: 'polygon(8% 0, 92% 0, 100% 100%, 0% 100%)',
+            }} />
+            <div style={{
+              position: 'absolute', top: 10, left: 0, right: 0, bottom: 0,
+              background: `linear-gradient(160deg, ${fc}20, ${fc}06)`,
+              border: `1px solid ${fc}3a`,
+              borderRadius: '2px var(--r-md) 2px 2px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FolderOpen size={22} color={fc} weight="duotone" />
+            </div>
+          </>
+        )}
+        {folder.isProject && (
+          <span style={{
+            position: 'absolute', top: 6, right: 8,
+            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+            color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em',
+            padding: '2px 6px', borderRadius: 2,
+            background: `${fc}cc`, backdropFilter: 'blur(4px)',
+          }}>
+            projeto
+          </span>
+        )}
+      </div>
+
+      <div style={{ padding: '10px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -805,9 +785,6 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {folder.name}/
               </span>
-              {folder.isProject && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.35)', borderRadius: 3, padding: '1px 5px', flexShrink: 0 }}>projeto</span>
-              )}
             </div>
             {folder.description && (
               <div style={{
@@ -857,10 +834,6 @@ function FolderBtn({ title, icon, onClick, danger = false }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// FolderPicker dropdown
-// ─────────────────────────────────────────────
-
 function FolderPicker({ folders, onPick }) {
   return (
     <div style={{
@@ -886,10 +859,6 @@ function FolderPicker({ folders, onPick }) {
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// ReferenceCard  (igual ao original — sem mudanças de visual)
-// ─────────────────────────────────────────────
 
 function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFolder, onEdit, onRead }) {
   const dispatch = useDispatch();
@@ -966,7 +935,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
     );
   };
 
-  // ── LIST ────────────────────────────────────
   if (view === 'list') return (
     <div
       draggable
@@ -1049,7 +1017,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
     </div>
   );
 
-  // ── GRID (estilo livraria) ────────────────────────────────────
   return (
     <div
       draggable
@@ -1068,22 +1035,52 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
         display: 'flex', flexDirection: 'column',
       }}
     >
-      {/* Cover / preview area */}
       <div style={{
-        height: 100, background: `linear-gradient(135deg, var(--bg3), var(--bg4))`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', borderBottom: '1px solid var(--brd)',
+        height: 108, background: `linear-gradient(135deg, var(--bg3), var(--bg4))`,
+        display: 'flex', position: 'relative', borderBottom: '1px solid var(--brd)',
+        overflow: 'hidden',
       }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800,
-          color: 'var(--acc)', opacity: 0.15, letterSpacing: '-0.03em',
-          textTransform: 'uppercase', userSelect: 'none',
-        }}>
-          {(reference.type || 'ref').toUpperCase()}
+          width: 8, flexShrink: 0,
+          background: reference.type === 'my_article' ? 'var(--acc)'
+            : reference.type === 'dataset' ? 'var(--green)'
+            : reference.type === 'book' ? '#F472B6'
+            : reference.type === 'thesis' ? '#60A5FA'
+            : '#8A8680',
+        }} />
+
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800,
+            color: 'var(--acc)', opacity: 0.13, letterSpacing: '-0.03em',
+            textTransform: 'uppercase', userSelect: 'none',
+          }}>
+            {(reference.type || 'ref').toUpperCase()}
+          </div>
+
+          <div style={{
+            position: 'absolute', bottom: 6, right: 10,
+            fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
+            opacity: 0.55, letterSpacing: '0.04em',
+          }}>
+            Nº {String(reference.id || '').slice(0, 6).toUpperCase() || '000000'}
+          </div>
         </div>
-        {/* Type badge */}
+
+        {reference.isFavorite && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0, width: 0, height: 0,
+            borderStyle: 'solid', borderWidth: '0 26px 26px 0',
+            borderColor: `transparent var(--acc) transparent transparent`,
+            opacity: 0.9,
+          }}>
+            <Star size={11} weight="fill" color="var(--bg0)"
+              style={{ position: 'absolute', top: 4, right: -22 }} />
+          </div>
+        )}
+
         <span style={{
-          position: 'absolute', top: 8, left: 8,
+          position: 'absolute', top: 8, left: 16,
           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
           color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em',
           padding: '2px 7px', borderRadius: 2,
@@ -1091,14 +1088,10 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
         }}>
           {typeLabels[reference.type] || reference.type}
         </span>
-        {/* Favorite star */}
-        {reference.isFavorite && (
-          <Star size={14} weight="fill" color="var(--acc)" style={{ position: 'absolute', top: 8, right: 8 }} />
-        )}
-        {/* Read status */}
+
         {reference.isRead && (
           <span style={{
-            position: 'absolute', bottom: 6, right: 8,
+            position: 'absolute', bottom: 6, left: 24,
             fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
             color: 'var(--green)', background: 'var(--green-bg)',
             border: '1px solid rgba(74,222,128,0.2)', padding: '1px 6px', borderRadius: 2,
@@ -1106,10 +1099,10 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
             ✓ LIDO
           </span>
         )}
-        {/* File type indicator */}
+
         {reference.filePath && (
           <span style={{
-            position: 'absolute', bottom: 6, left: 8,
+            position: 'absolute', top: 8, right: 10,
             display: 'flex', alignItems: 'center', gap: 3,
             fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
             background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 2,
@@ -1121,7 +1114,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
         )}
       </div>
 
-      {/* Content */}
       <div style={{ padding: '12px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{
           fontFamily: 'var(--font-display)', fontWeight: 700,
@@ -1170,10 +1162,8 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
           </div>
         )}
 
-        {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Action bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           paddingTop: 8, borderTop: '1px solid var(--brd)', marginTop: 4,
@@ -1245,10 +1235,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// FolderModal
-// ─────────────────────────────────────────────
 
 function FolderModal({ folder, onClose, onSave, onDelete }) {
   const imageInputRef = useRef(null);
@@ -1395,10 +1381,6 @@ function FolderModal({ folder, onClose, onSave, onDelete }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// EditReferenceModal
-// ─────────────────────────────────────────────
-
 function EditReferenceModal({ profileId, reference, onClose }) {
   const dispatch = useDispatch();
   const [title, setTitle] = useState(reference.title || '');
@@ -1487,7 +1469,6 @@ function EditReferenceModal({ profileId, reference, onClose }) {
             </div>
           </div>
 
-          {/* Rating + Qualis + Status */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
               <label style={labelStyle}>avaliação</label>
@@ -1565,10 +1546,6 @@ function EditReferenceModal({ profileId, reference, onClose }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// AddReferenceModal
-// ─────────────────────────────────────────────
-
 function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) {
   const dispatch = useDispatch();
   const fileInputRef = useRef(null);
@@ -1619,7 +1596,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
         },
         file: attachMode === 'file' ? file : null,
       })).unwrap();
-      // Se o modal foi aberto dentro de uma pasta, vincula a referência recém-criada a ela
       const newId = typeof result === 'string' ? result : result?.id;
       if (targetFolder && newId) {
         await onAddToFolder?.(newId, targetFolder.id);
@@ -1751,7 +1727,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
           <div><label style={labelStyle}>DOI (opcional)</label>
             <input value={doi} onChange={e => setDoi(e.target.value)} placeholder="10.xxxx/xxxxx" style={inputStyle} /></div>
 
-          {/* Rating + Status */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
               <label style={labelStyle}>avaliação</label>
@@ -1813,10 +1788,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
     </div>
   );
 }
-
-// ─────────────────────────────────────────────
-// Shared micro-style
-// ─────────────────────────────────────────────
 
 const cardBtnStyle = {
   padding: '3px 5px', borderRadius: 'var(--r-sm)',
