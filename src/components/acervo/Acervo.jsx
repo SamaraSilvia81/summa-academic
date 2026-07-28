@@ -286,47 +286,16 @@ export function Acervo({ profileId }) {
   // ─────────────────────────────────────────────
   return (
     <div className="animate-fade-in">
-
-      {/* ── Sub-abas ── */}
-      <div style={{ display: 'flex', gap: 4, margin: '15px 0 0' }}>
-        {[
-          ['referencias', 'Referências', BookmarkSimple],
-          ['leitura', 'Leitura', BookOpenText],
-        ].map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setActiveTab(key)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
-            padding: '7px 12px', cursor: 'pointer', background: 'none',
-            border: 'none', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
-            color: activeTab === key ? 'var(--tx)' : 'var(--tx3)',
-          }}>
-            <Icon size={14} weight={activeTab === key ? 'fill' : 'regular'} /> {label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'leitura' && (
-        <Leitura
-          profileId={profileId}
-          directRef={readingRef}
-          acervoRefs={references}
-          onClearDirectRef={() => setReadingRef(null)}
-          onReadRef={(ref) => { setReadingRef(ref); setActiveTab('leitura'); }}
-        />
-      )}
-
-      {activeTab === 'referencias' && (<>
-
       {/* ══════════════════ HERO BANNER ══════════════════ */}
       <div style={{
         width: '100%', borderRadius: 'var(--r-xl)', overflow: 'hidden',
         margin: '14px 0 20px', position: 'relative',
         border: '1px solid var(--brd)',
         background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
-        minHeight: 160,
+        minHeight: 200,
       }}>
         <img
-          src="./public/banner-acervo.png"
+          src="./public/banner-farol.png"
           alt=""
           onError={e => { e.target.style.display = 'none'; }}
           style={{ position: 'absolute', inset: 0, zIndex: 1, width: '100%', height: '100%', objectFit: 'cover' }}
@@ -336,7 +305,7 @@ export function Acervo({ profileId }) {
           background: 'linear-gradient(135deg, rgba(4,7,13,0.82), rgba(4,7,13,0.45))',
         }} />
         <div style={{
-          position: 'relative', zIndex: 3, padding: '28px 28px 22px',
+          position: 'relative', zIndex: 3, padding: '36px 32px 28px',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
           <div>
@@ -347,9 +316,25 @@ export function Acervo({ profileId }) {
             }}>
               — acervo
             </div>
+            <div style={{ display: 'flex', gap: 4, margin: '15px 0 0', marginLeft: '45rem', flexWrap: 'wrap', justifyContent: 'flex-end', position: 'absolute', right: 32, bottom: 165 }}>
+              {[
+                ['referencias', 'Referências', BookmarkSimple],
+                ['leitura', 'Leitura', BookOpenText],
+              ].map(([key, label, Icon]) => (
+                <button key={key} onClick={() => setActiveTab(key)} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
+                  padding: '7px 12px', cursor: 'pointer', background: 'none',
+                  border: 'none', width: '30%', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
+                  color: activeTab === key ? 'var(--tx)' : 'var(--tx3)',
+                }}>
+                  <Icon size={14} weight={activeTab === key ? 'fill' : 'regular'} /> {label}
+                </button>
+              ))}
+            </div>
             <div style={{
               fontFamily: 'var(--font-display)', fontWeight: 800,
-              fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', color: '#fff',
+              fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', color: '#fff',
               lineHeight: 1.1, letterSpacing: '-0.02em',
             }}>
               Minha <span style={{ color: 'var(--acc)' }}>Biblioteca</span>
@@ -371,7 +356,7 @@ export function Acervo({ profileId }) {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 'var(--r-md)', padding: '8px 14px', maxWidth: 480,
+            borderRadius: 'var(--r-md)', margin: '15px 0 5px', padding: '8px 14px', maxWidth: 480,
             backdropFilter: 'blur(8px)',
           }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--acc)', fontWeight: 600 }}>›_</span>
@@ -387,6 +372,37 @@ export function Acervo({ profileId }) {
           </div>
         </div>
       </div>
+
+      {/* ── Sub-abas ── */}
+      {/* <div style={{ display: 'flex', gap: 4, margin: '15px 0 0' }}>
+        {[
+          ['referencias', 'Referências', BookmarkSimple],
+          ['leitura', 'Leitura', BookOpenText],
+        ].map(([key, label, Icon]) => (
+          <button key={key} onClick={() => setActiveTab(key)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
+            padding: '7px 12px', cursor: 'pointer', background: 'none',
+            border: 'none', borderBottom: `2px solid ${activeTab === key ? 'var(--acc)' : 'transparent'}`,
+            color: activeTab === key ? 'var(--tx)' : 'var(--tx3)',
+          }}>
+            <Icon size={14} weight={activeTab === key ? 'fill' : 'regular'} /> {label}
+          </button>
+        ))}
+      </div> */}
+
+      {activeTab === 'leitura' && (
+        <Leitura
+          profileId={profileId}
+          directRef={readingRef}
+          acervoRefs={references}
+          onClearDirectRef={() => setReadingRef(null)}
+          onReadRef={(ref) => { setReadingRef(ref); setActiveTab('leitura'); }}
+        />
+      )}
+
+      {activeTab === 'referencias' && (<>
+
 
       {/* ── Breadcrumb ── */}
       {currentFolderObj && (
@@ -413,18 +429,18 @@ export function Acervo({ profileId }) {
         marginBottom: 14, flexWrap: 'wrap',
       }}>
         {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 2, flex: 1, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setActiveFilter(f)} style={{
               fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
-              padding: '5px 12px', cursor: 'pointer',
+              padding: '4px 12px', cursor: 'pointer',
               borderRadius: 'var(--r-sm)',
-              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid transparent',
+              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid var(--brd2)',
               background: activeFilter === f ? 'var(--acc-bg)' : 'transparent',
               color: activeFilter === f ? 'var(--acc)' : 'var(--tx3)',
               transition: 'all 0.18s',
             }}>
-              // {f.toUpperCase()}
+              {f}
             </button>
           ))}
         </div>
@@ -708,8 +724,8 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
       {hover && !editing && (
         <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
           <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
-          <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} />
-          <FolderBtn title="editar pasta" icon={<DotsThree size={11} />} onClick={onEdit} />
+          {/* <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} /> */}
+          <FolderBtn title="editar pasta"icon={<PencilSimple size={11} />} onClick={onEdit} />
           <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
         </div>
       )}
@@ -770,8 +786,8 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
           {hover && !editing && (
             <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
               <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
-              <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} />
-              <FolderBtn title="editar pasta" icon={<DotsThree size={11} />} onClick={onEdit} />
+              {/* <FolderBtn title="renomear" icon={<PencilSimple size={11} />} onClick={() => setEditing(true)} /> */}
+              <FolderBtn title="editar pasta" icon={<PencilSimple size={11} />} onClick={onEdit} />
               <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
             </div>
           )}
@@ -1358,9 +1374,15 @@ function EditReferenceModal({ profileId, reference, onClose }) {
   const [year, setYear] = useState(reference.year ? String(reference.year) : '');
   const [type, setType] = useState(reference.type || 'paper_read');
   const [tags, setTags] = useState((reference.tags || []).join(', '));
+  const [doi, setDoi] = useState(reference.doi || '');
+  const [qualis, setQualis] = useState(reference.qualis || '');
+  const [personalNote, setPersonalNote] = useState(reference.personalNote || '');
+  const [rating, setRating] = useState(reference.rating || 0);
+  const [isRead, setIsRead] = useState(reference.isRead || false);
   const [saving, setSaving] = useState(false);
 
   const canSubmit = title.trim().length > 0 && !saving;
+  const QUALIS_OPT = ['A1','A2','A3','A4','B1','B2','B3','B4','C'];
 
   async function submit() {
     if (!canSubmit) return;
@@ -1373,6 +1395,8 @@ function EditReferenceModal({ profileId, reference, onClose }) {
           title: title.trim(), authors: authors.trim(),
           venue: venue.trim(), year: year ? Number(year) : null,
           type, tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+          doi: doi.trim() || null, qualis: qualis || null,
+          personalNote: personalNote.trim(), rating: rating || null, isRead,
         },
       })).unwrap();
       onClose();
@@ -1387,8 +1411,8 @@ function EditReferenceModal({ profileId, reference, onClose }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: 'var(--bg1)', border: '1px solid var(--brd2)',
-        borderRadius: 'var(--r-xl)', width: '100%', maxWidth: 480,
-        maxHeight: '86vh', display: 'flex', flexDirection: 'column',
+        borderRadius: 'var(--r-xl)', width: '100%', maxWidth: 540,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
       }}>
         <div style={{
@@ -1411,24 +1435,76 @@ function EditReferenceModal({ profileId, reference, onClose }) {
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}><label style={labelStyle}>venue</label>
               <input value={venue} onChange={e => setVenue(e.target.value)} placeholder="Ex: ICSME" style={inputStyle} /></div>
-            <div style={{ width: 100 }}><label style={labelStyle}>ano</label>
-              <input value={year} onChange={e => setYear(e.target.value.replace(/\D/g, ''))} placeholder="2026" style={inputStyle} /></div>
+            <div style={{ width: 80 }}><label style={labelStyle}>ano</label>
+              <input value={year} onChange={e => setYear(e.target.value.replace(/\D/g,''))} placeholder="2026" style={inputStyle} /></div>
           </div>
+          <div><label style={labelStyle}>DOI</label>
+            <input value={doi} onChange={e => setDoi(e.target.value)} placeholder="10.xxxx/xxxxx" style={inputStyle} /></div>
           <div><label style={labelStyle}>tipo</label>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {TYPE_OPTIONS.map(opt => (
                 <button key={opt.value} onClick={() => setType(opt.value)} style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
-                  padding: '4px 10px', borderRadius: 3, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+                  padding: '4px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
                   border: `1px solid ${type === opt.value ? 'var(--acc)' : 'var(--brd)'}`,
-                  background: type === opt.value ? 'var(--acc)' : 'transparent',
-                  color: type === opt.value ? 'var(--bg0)' : 'var(--tx2)',
+                  background: type === opt.value ? 'var(--acc-bg)' : 'transparent',
+                  color: type === opt.value ? 'var(--acc)' : 'var(--tx3)',
                 }}>{opt.label}</button>
               ))}
             </div>
           </div>
+
+          {/* Rating + Qualis + Status */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={labelStyle}>avaliação</label>
+              <div style={{ display: 'flex', gap: 2 }}>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setRating(rating === n ? 0 : n)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  }}>
+                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'}
+                      color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>qualis</label>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {QUALIS_OPT.map(q => (
+                  <button key={q} onClick={() => setQualis(qualis === q ? '' : q)} style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+                    padding: '3px 6px', borderRadius: 2, cursor: 'pointer',
+                    border: `1px solid ${qualis === q ? 'var(--acc)' : 'var(--brd)'}`,
+                    background: qualis === q ? 'var(--acc-bg)' : 'transparent',
+                    color: qualis === q ? 'var(--acc)' : 'var(--tx3)',
+                  }}>{q}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>status</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[{v:false,l:'Para ler',c:'var(--tx3)'},{v:true,l:'Lido',c:'var(--green)'}].map(s => (
+                  <button key={String(s.v)} onClick={() => setIsRead(s.v)} style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+                    padding: '4px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                    border: `1px solid ${isRead === s.v ? s.c : 'var(--brd)'}`,
+                    background: isRead === s.v ? `${s.c}15` : 'transparent',
+                    color: isRead === s.v ? s.c : 'var(--tx3)',
+                  }}>{s.l}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div><label style={labelStyle}>tags (separadas por vírgula)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Ex: SATD, MSR" style={inputStyle} /></div>
+            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Ex: SATD, MSR, technical-debt" style={inputStyle} /></div>
+          <div><label style={labelStyle}>nota pessoal</label>
+            <textarea value={personalNote} onChange={e => setPersonalNote(e.target.value)}
+              placeholder="Suas impressões, conexões com a pesquisa..."
+              rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} /></div>
         </div>
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 8,
@@ -1448,7 +1524,7 @@ function EditReferenceModal({ profileId, reference, onClose }) {
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             {saving && <Spinner size={14} className="animate-spin" />}
-            {saving ? 'salvando...' : 'salvar alterações'}
+            {saving ? 'salvando...' : 'salvar'}
           </button>
         </div>
       </div>
@@ -1470,6 +1546,10 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
   const [year, setYear] = useState('');
   const [type, setType] = useState('paper_read');
   const [tags, setTags] = useState('');
+  const [doi, setDoi] = useState('');
+  const [personalNote, setPersonalNote] = useState('');
+  const [rating, setRating] = useState(0);
+  const [isRead, setIsRead] = useState(false);
   const [attachMode, setAttachMode] = useState('file');
   const [file, setFile] = useState(null);
   const [link, setLink] = useState('');
@@ -1498,10 +1578,11 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
         data: {
           title: title.trim(), authors: authors.trim(),
           venue: venue.trim(), year: year ? Number(year) : null,
-          doi: null, url: attachMode === 'link' && link.trim() ? link.trim() : null,
+          doi: doi.trim() || null, url: attachMode === 'link' && link.trim() ? link.trim() : null,
           type, qualis: null,
           tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-          personalNote: '', rating: null, isRead: false, isFavorite: false, createdAt: new Date(),
+          personalNote: personalNote.trim(), rating: rating || null,
+          isRead, isFavorite: false, createdAt: new Date(),
         },
         file: attachMode === 'file' ? file : null,
       })).unwrap();
@@ -1633,6 +1714,45 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
           </div>
           <div><label style={labelStyle}>tags (separadas por vírgula)</label>
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Ex: SATD, MSR" style={inputStyle} /></div>
+
+          <div><label style={labelStyle}>DOI (opcional)</label>
+            <input value={doi} onChange={e => setDoi(e.target.value)} placeholder="10.xxxx/xxxxx" style={inputStyle} /></div>
+
+          {/* Rating + Status */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={labelStyle}>avaliação</label>
+              <div style={{ display: 'flex', gap: 2 }}>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} type="button" onClick={() => setRating(rating === n ? 0 : n)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  }}>
+                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'}
+                      color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>status</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[{v:false,l:'Para ler',c:'var(--tx3)'},{v:true,l:'Lido',c:'var(--green)'}].map(s => (
+                  <button key={String(s.v)} type="button" onClick={() => setIsRead(s.v)} style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+                    padding: '4px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                    border: `1px solid ${isRead === s.v ? s.c : 'var(--brd)'}`,
+                    background: isRead === s.v ? `${s.c}15` : 'transparent',
+                    color: isRead === s.v ? s.c : 'var(--tx3)',
+                  }}>{s.l}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div><label style={labelStyle}>nota pessoal (opcional)</label>
+            <textarea value={personalNote} onChange={e => setPersonalNote(e.target.value)}
+              placeholder="Por que é relevante? Conexões com sua pesquisa..."
+              rows={2} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} /></div>
         </div>
 
         <div style={{
