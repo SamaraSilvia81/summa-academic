@@ -1082,12 +1082,38 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
 
       {/* Content */}
       <div style={{ padding: '10px 12px 8px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontWeight: 700,
-          fontSize: 13, lineHeight: 1.3, marginBottom: 3, color: 'var(--tx)',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>
-          {reference.title}
+        {/* Title + inline actions */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700,
+            fontSize: 13, lineHeight: 1.3, color: 'var(--tx)', flex: 1, minWidth: 0,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {reference.title}
+          </div>
+          <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginTop: 1 }}>
+            {reference.filePath && (
+              <button onClick={e => { e.stopPropagation(); handleDownload(); }} className="acervo-card-btn" style={cardBtnStyle} title="baixar">
+                <DownloadSimple size={10} />
+              </button>
+            )}
+            <button onClick={toggleFavorite} className="acervo-card-btn" style={cardBtnStyle} title="favoritar">
+              <Star size={10} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} className="acervo-card-btn" style={cardBtnStyle} title="editar">
+              <PencilSimple size={10} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onShare(); }} className="acervo-card-btn" style={cardBtnStyle} title="compartilhar">
+              <ShareNetwork size={10} />
+            </button>
+            <button onClick={handleDelete} className="acervo-card-btn" title={confirmDelete ? 'confirmar' : 'excluir'} style={{
+              ...cardBtnStyle,
+              color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.35)',
+              borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
+            }}>
+              {busy ? <Spinner size={10} className="animate-spin" /> : <Trash size={10} />}
+            </button>
+          </div>
         </div>
 
         <div style={{
@@ -1117,17 +1143,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
           </div>
         )}
 
-        {reference.personalNote && (
-          <div style={{
-            fontSize: 11, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
-            lineHeight: 1.4, marginBottom: 4,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden', fontStyle: 'italic', opacity: 0.7,
-          }}>
-            {reference.personalNote}
-          </div>
-        )}
-
         {(reference.tags || []).length > 0 && (
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
             {reference.tags.slice(0, 3).map((tag) => (
@@ -1141,6 +1156,17 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
             {reference.tags.length > 3 && (
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)' }}>+{reference.tags.length - 3}</span>
             )}
+          </div>
+        )}
+
+        {reference.personalNote && (
+          <div style={{
+            fontSize: 11, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
+            lineHeight: 1.4, marginBottom: 4,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden', fontStyle: 'italic', opacity: 0.7,
+          }}>
+            {reference.personalNote}
           </div>
         )}
 
@@ -1159,34 +1185,6 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
           </button>
         )}
 
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-          <div style={{ display: 'flex', gap: 2 }}>
-            {reference.filePath && (
-              <button onClick={e => { e.stopPropagation(); handleDownload(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="baixar">
-                <DownloadSimple size={11} />
-              </button>
-            )}
-            <button onClick={toggleFavorite} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="favoritar">
-              <Star size={11} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 2 }}>
-            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="editar">
-              <PencilSimple size={11} />
-            </button>
-            <button onClick={e => { e.stopPropagation(); onShare(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="compartilhar">
-              <ShareNetwork size={11} />
-            </button>
-            <button onClick={handleDelete} title={confirmDelete ? 'confirmar' : 'excluir'} style={{
-              ...cardBtnStyle,
-              color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.35)',
-              borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
-            }}>
-              {busy ? <Spinner size={11} className="animate-spin" /> : <Trash size={11} />}
-            </button>
-          </div>
-        </div>
       </div>
       <input ref={fileInputRef} type="file" onChange={e => handleFile(e.target.files?.[0])} style={{ display: 'none' }} />
     </div>
@@ -1752,5 +1750,3 @@ const cardBtnStyle = {
   color: 'var(--tx3)', cursor: 'pointer', display: 'flex', alignItems: 'center',
   transition: 'all 0.1s',
 };
-
-// Classe CSS pra hover — adicionar className="acervo-card-btn" em cada botão que usa cardBtnStyle
