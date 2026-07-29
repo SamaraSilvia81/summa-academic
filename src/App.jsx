@@ -104,7 +104,9 @@ export default function App() {
             <Route path="/farol" element={<Farol profileId={profile.id} />} />
             <Route path="/bancada" element={<BancadaPage profileId={profile.id} search={globalSearch} />} />
             <Route path="/bancada/editor" element={<EditorPage profileId={profile.id} />} />
-            <Route path="/acervo" element={<Acervo profileId={profile.id} />} />
+            <Route path="/acervo" element={<Navigate to="/acervo/referencias" replace />} />
+            <Route path="/acervo/:tab" element={<Acervo profileId={profile.id} />} />
+            <Route path="/acervo/pasta/:folderId" element={<Acervo profileId={profile.id} />} />
             <Route path="/settings" element={<Settings profileId={profile.id} />} />
             <Route path="/pauta" element={<EmptyModule name="Pauta" icon="Kanban" description="Kanban, milestones, cronogramas e deadlines." />} />
             <Route path="/vitrine" element={<EmptyModule name="Vitrine" icon="Eye" description="Portfolio academico publico." />} />
@@ -115,4 +117,3 @@ export default function App() {
     </div>
   );
 }
-

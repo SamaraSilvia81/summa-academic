@@ -155,8 +155,8 @@ export const deleteReference = createAsyncThunk(
 export const updateReference = createAsyncThunk(
   'data/updateReference',
   async ({ profileId, reference }, { dispatch }) => {
-    const { title, authors, venue, year, type, tags } = reference;
-    await ReferenceRepo.update(reference.id, { title, authors, venue, year, type, tags });
+    const { title, authors, venue, year, type, tags, doi, qualis, personalNote, rating, isRead, url } = reference;
+    await ReferenceRepo.update(reference.id, { title, authors, venue, year, type, tags, doi, qualis, personalNote, rating, isRead, url });
     await dispatch(loadReferences(profileId));
     return reference.id;
   },

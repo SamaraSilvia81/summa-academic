@@ -1,10 +1,11 @@
 ﻿import { useRef, useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   MagnifyingGlass, Star, Plus, X, Paperclip, DownloadSimple,
   Trash, CloudArrowUp, FilePdf, Spinner, LinkSimple, ArrowSquareOut,
   SquaresFour, Rows, FolderPlus, FolderOpen, PencilSimple,
-  ShareNetwork, CaretLeft, Folder, Funnel,
+  ShareNetwork, CaretLeft, CaretRight, Folder, Funnel,
   FileImage, FileVideo, FileAudio, FileDoc, FileZip, File as FileGeneric,
   BookOpenText, BookmarkSimple,
 } from '@phosphor-icons/react';
@@ -21,6 +22,7 @@ import {
 } from '../../store/slices/dataSlice';
 import { getReferenceFileUrl } from '../../lib/storage';
 import { ReferenceFolderRepo } from '../../services/repositories';
+import { PdfThumbnail } from './PdfThumbnail';
 
 const FILTERS = ['todos', 'papers', 'meus artigos', 'datasets', 'notas', 'favoritos'];
 
@@ -150,13 +152,20 @@ function useReferenceFolders(profileId) {
 
 export function Acervo({ profileId }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { tab, folderId } = useParams();
   const references = useReferences(profileId);
   const {
     folders, createFolder, updateFolder,
     deleteFolder, addRefToFolder,
   } = useReferenceFolders(profileId);
 
-  const [activeTab, setActiveTab] = useState('referencias');
+  // ── Derivados das rotas ──
+  const activeTab = folderId ? 'referencias' : (tab || 'referencias');
+  const currentFolder = folderId || null;
+  const setActiveTab = (t) => navigate(`/acervo/${t}`);
+  const setCurrentFolder = (id) => id ? navigate(`/acervo/pasta/${id}`) : navigate('/acervo/referencias');
+
   const [readingRef, setReadingRef] = useState(null);
   const [activeFilter, setActiveFilter] = useState('todos');
   const [search, setSearch] = useState('');
@@ -166,7 +175,6 @@ export function Acervo({ profileId }) {
   const [filterHasFile, setFilterHasFile] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [view, setView] = useState('grid');
-  const [currentFolder, setCurrentFolder] = useState(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [editFolderOpen, setEditFolderOpen] = useState(null);
   const [editRefOpen, setEditRefOpen] = useState(null);
@@ -270,7 +278,7 @@ export function Acervo({ profileId }) {
         minHeight: 200,
       }}>
         <img
-          src="./public/banner-farol.png"
+          src="/banner-farol.png"
           alt=""
           onError={e => { e.target.style.display = 'none'; }}
           style={{ position: 'absolute', inset: 0, zIndex: 1, width: '100%', height: '100%', objectFit: 'cover' }}
@@ -506,7 +514,7 @@ export function Acervo({ profileId }) {
       {!currentFolder && folders.length > 0 && (
         <div style={{
           display: view === 'grid' ? 'grid' : 'flex',
-          gridTemplateColumns: view === 'grid' ? 'repeat(3, 1fr)' : undefined,
+          gridTemplateColumns: view === 'grid' ? 'repeat(auto-fill, minmax(200px, 1fr))' : undefined,
           flexDirection: view === 'list' ? 'column' : undefined,
           gap: 8, marginBottom: 16,
         }}>
@@ -738,76 +746,43 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
         background: 'var(--bg1)',
         border: `1px solid ${dragOver ? 'var(--acc)' : hover ? fc + '55' : 'var(--brd)'}`,
         borderRadius: 'var(--r-lg)', cursor: 'pointer', overflow: 'hidden',
-        transition: 'border-color 0.15s, box-shadow 0.15s', minHeight: 118,
-        boxShadow: dragOver ? `0 0 0 2px ${fc}44` : hover ? `0 2px 16px ${fc}22` : 'none',
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+        boxShadow: dragOver ? `0 0 0 2px ${fc}44` : hover ? `0 2px 20px ${fc}22` : 'none',
         display: 'flex', flexDirection: 'column',
       }}
     >
-      <div style={{ position: 'relative', height: 46, flexShrink: 0 }}>
-        {folder.image ? (
-          <div style={{ position: 'absolute', inset: 0, background: `center/cover no-repeat url(${folder.image})` }} />
-        ) : (
-          <>
-            <div style={{
-              position: 'absolute', top: 0, left: 16, width: 46, height: 14,
-              background: fc, borderRadius: '3px 3px 0 0', opacity: 0.95,
-              clipPath: 'polygon(8% 0, 92% 0, 100% 100%, 0% 100%)',
-            }} />
-            <div style={{
-              position: 'absolute', top: 10, left: 0, right: 0, bottom: 0,
-              background: `linear-gradient(160deg, ${fc}20, ${fc}06)`,
-              border: `1px solid ${fc}3a`,
-              borderRadius: '2px var(--r-md) 2px 2px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <FolderOpen size={22} color={fc} weight="duotone" />
-            </div>
-          </>
-        )}
-        {folder.isProject && (
-          <span style={{
-            position: 'absolute', top: 6, right: 8,
-            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-            color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em',
-            padding: '2px 6px', borderRadius: 2,
-            background: `${fc}cc`, backdropFilter: 'blur(4px)',
-          }}>
-            projeto
-          </span>
-        )}
-      </div>
+      {folder.image ? (
+        <div style={{ height: 52, background: `center/cover no-repeat url(${folder.image})`, flexShrink: 0 }} />
+      ) : (
+        <div style={{ height: 2, background: `linear-gradient(90deg,${fc},${fc}22)` }} />
+      )}
 
-      <div style={{ padding: '10px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: fc, flexShrink: 0 }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {folder.name}/
-              </span>
-            </div>
-            {folder.description && (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginTop: 2,
-                overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
-                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.5,
-              }}>
-                {folder.description}
-              </div>
+      <div style={{ padding: '10px 12px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: fc, flexShrink: 0 }} />
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--tx)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {folder.name}/
+            </span>
+            {folder.isProject && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)',
+                border: '1px solid rgba(212,160,48,0.35)', borderRadius: 3, padding: '1px 5px', flexShrink: 0,
+              }}>projeto</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-            <FolderBtn title="compartilhar" icon={<ShareNetwork size={11} />} onClick={onShare} />
-            <FolderBtn title="editar pasta" icon={<PencilSimple size={11} />} onClick={onEdit} />
-            <FolderBtn title="excluir" icon={<Trash size={11} />} onClick={onDelete} danger />
+            <FolderBtn title="compartilhar" icon={<ShareNetwork size={10} />} onClick={onShare} />
+            <FolderBtn title="editar" icon={<PencilSimple size={10} />} onClick={onEdit} />
+            <FolderBtn title="excluir" icon={<Trash size={10} />} onClick={onDelete} danger />
           </div>
         </div>
-        <span style={{
-          marginTop: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11,
-          color: 'var(--tx3)', paddingTop: 8,
-        }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginTop: 4, paddingLeft: 13 }}>
           {count} item{count !== 1 ? 's' : ''}
-        </span>
+        </div>
       </div>
     </div>
   );
@@ -975,29 +950,29 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
       <FileMeta />
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') && (
-          <button onClick={e => { e.stopPropagation(); onRead?.(); }} title="ler PDF" style={{
+          <button className="acervo-card-btn" onClick={e => { e.stopPropagation(); onRead?.(); }} title="ler PDF" style={{
             ...cardBtnStyle, background: 'rgba(212,160,48,0.1)', borderColor: 'rgba(212,160,48,0.3)', color: 'var(--acc)',
           }}>
             <BookOpenText size={13} weight="fill" />
           </button>
         )}
-        <button onClick={toggleFavorite} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'} style={cardBtnStyle}>
+        <button onClick={toggleFavorite} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
           <Star size={13} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
         </button>
-        <button onClick={e => { e.stopPropagation(); onEdit?.(); }} title="editar metadados" style={cardBtnStyle}>
+        <button onClick={e => { e.stopPropagation(); onEdit?.(); }} title="editar metadados" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
           <PencilSimple size={13} />
         </button>
         {reference.filePath && (
-          <button onClick={e => { e.stopPropagation(); handleDownload(); }} title="baixar" style={cardBtnStyle}>
+          <button onClick={e => { e.stopPropagation(); handleDownload(); }} title="baixar" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
             <DownloadSimple size={13} />
           </button>
         )}
-        <button onClick={e => { e.stopPropagation(); onShare(); }} title="compartilhar link" style={cardBtnStyle}>
+        <button onClick={e => { e.stopPropagation(); onShare(); }} title="compartilhar link" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
           <ShareNetwork size={13} />
         </button>
         {folders.length > 0 && (
           <div style={{ position: 'relative' }}>
-            <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} title="adicionar à pasta" style={cardBtnStyle}>
+            <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} title="adicionar à pasta" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
               <Folder size={13} />
             </button>
             {folderMenuOpen && (
@@ -1017,6 +992,12 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
     </div>
   );
 
+  // ── GRID (biblioteca digital — vertical) ────────────────────────
+  const typeColor = reference.type === 'my_article' ? 'var(--acc)'
+    : reference.type === 'dataset' ? 'var(--green)'
+    : reference.type === 'book' ? '#F472B6'
+    : reference.type === 'thesis' ? '#60A5FA' : '#8A8680';
+
   return (
     <div
       draggable
@@ -1035,192 +1016,168 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
         display: 'flex', flexDirection: 'column',
       }}
     >
+      {/* Cover — PDF thumbnail or type placeholder */}
       <div style={{
-        height: 108, background: `linear-gradient(135deg, var(--bg3), var(--bg4))`,
-        display: 'flex', position: 'relative', borderBottom: '1px solid var(--brd)',
-        overflow: 'hidden',
+        height: 140, position: 'relative', overflow: 'hidden',
+        background: `linear-gradient(160deg, var(--bg3), var(--bg4))`,
+        borderBottom: '1px solid var(--brd)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{
-          width: 8, flexShrink: 0,
-          background: reference.type === 'my_article' ? 'var(--acc)'
-            : reference.type === 'dataset' ? 'var(--green)'
-            : reference.type === 'book' ? '#F472B6'
-            : reference.type === 'thesis' ? '#60A5FA'
-            : '#8A8680',
-        }} />
+        {/* Color accent bar top */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: typeColor }} />
 
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') ? (
+          <PdfThumbnail filePath={reference.filePath} width={200} height={140}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: 0 }} />
+        ) : (
           <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800,
-            color: 'var(--acc)', opacity: 0.13, letterSpacing: '-0.03em',
-            textTransform: 'uppercase', userSelect: 'none',
+            fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800,
+            color: typeColor, opacity: 0.1, textTransform: 'uppercase',
+            userSelect: 'none', letterSpacing: '-0.03em',
           }}>
             {(reference.type || 'ref').toUpperCase()}
           </div>
-
-          <div style={{
-            position: 'absolute', bottom: 6, right: 10,
-            fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
-            opacity: 0.55, letterSpacing: '0.04em',
-          }}>
-            Nº {String(reference.id || '').slice(0, 6).toUpperCase() || '000000'}
-          </div>
-        </div>
-
-        {reference.isFavorite && (
-          <div style={{
-            position: 'absolute', top: 0, right: 0, width: 0, height: 0,
-            borderStyle: 'solid', borderWidth: '0 26px 26px 0',
-            borderColor: `transparent var(--acc) transparent transparent`,
-            opacity: 0.9,
-          }}>
-            <Star size={11} weight="fill" color="var(--bg0)"
-              style={{ position: 'absolute', top: 4, right: -22 }} />
-          </div>
         )}
 
+        {/* Type badge */}
         <span style={{
-          position: 'absolute', top: 8, left: 16,
+          position: 'absolute', top: 10, left: 10,
           fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-          color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em',
+          color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em',
           padding: '2px 7px', borderRadius: 2,
-          background: 'rgba(212,160,48,0.7)', backdropFilter: 'blur(4px)',
+          background: `${typeColor}bb`, backdropFilter: 'blur(4px)',
         }}>
           {typeLabels[reference.type] || reference.type}
         </span>
 
-        {reference.isRead && (
-          <span style={{
-            position: 'absolute', bottom: 6, left: 24,
-            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-            color: 'var(--green)', background: 'var(--green-bg)',
-            border: '1px solid rgba(74,222,128,0.2)', padding: '1px 6px', borderRadius: 2,
-          }}>
-            ✓ LIDO
-          </span>
+        {/* Favorite corner */}
+        {reference.isFavorite && (
+          <Star size={13} weight="fill" color="var(--acc)"
+            style={{ position: 'absolute', top: 10, right: 10 }} />
         )}
 
+        {/* File info */}
         {reference.filePath && (
           <span style={{
-            position: 'absolute', top: 8, right: 10,
+            position: 'absolute', bottom: 6, right: 8,
             display: 'flex', alignItems: 'center', gap: 3,
-            fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
-            background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 2,
-            backdropFilter: 'blur(4px)',
+            fontFamily: 'var(--font-mono)', fontSize: 9, color: '#fff',
+            background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 2,
           }}>
             {fileIcon(reference.fileType, reference.fileName)}
             {reference.fileSize ? formatFileSize(reference.fileSize) : ''}
           </span>
         )}
+
+        {/* Read status */}
+        {reference.isRead && (
+          <span style={{
+            position: 'absolute', bottom: 6, left: 10,
+            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+            color: 'var(--green)', background: 'rgba(4,7,13,0.7)',
+            border: '1px solid rgba(74,222,128,0.3)', padding: '1px 6px', borderRadius: 2,
+          }}>✓ lido</span>
+        )}
       </div>
 
-      <div style={{ padding: '12px 14px 10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* Content */}
+      <div style={{ padding: '10px 12px 8px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div style={{
           fontFamily: 'var(--font-display)', fontWeight: 700,
-          fontSize: 14, lineHeight: 1.3, marginBottom: 4, color: 'var(--tx)',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
+          fontSize: 13, lineHeight: 1.3, marginBottom: 3, color: 'var(--tx)',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
           {reference.title}
         </div>
 
         <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginBottom: 6,
+          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', marginBottom: 4,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {reference.authors || '—'} {reference.year ? `· ${reference.year}` : ''}
         </div>
 
+        {(reference.rating > 0 || reference.qualis) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            {reference.rating > 0 && (
+              <div style={{ display: 'flex', gap: 1 }}>
+                {[1,2,3,4,5].map(n => (
+                  <Star key={n} size={10} weight={n <= reference.rating ? 'fill' : 'regular'}
+                    color={n <= reference.rating ? 'var(--acc)' : 'var(--tx3)'} style={{ opacity: n <= reference.rating ? 1 : 0.3 }} />
+                ))}
+              </div>
+            )}
+            {reference.qualis && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+                color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.3)',
+                padding: '1px 5px', borderRadius: 2,
+              }}>{reference.qualis}</span>
+            )}
+          </div>
+        )}
+
         {reference.personalNote && (
           <div style={{
-            fontSize: 12, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
-            lineHeight: 1.4, marginBottom: 6,
+            fontSize: 11, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
+            lineHeight: 1.4, marginBottom: 4,
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden', fontStyle: 'italic', opacity: 0.8,
+            overflow: 'hidden', fontStyle: 'italic', opacity: 0.7,
           }}>
             {reference.personalNote}
           </div>
         )}
 
         {(reference.tags || []).length > 0 && (
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
-            {reference.tags.slice(0, 4).map((tag) => (
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
+            {reference.tags.slice(0, 3).map((tag) => (
               <span key={tag} style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10,
-                padding: '1px 6px', borderRadius: 2,
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                padding: '1px 5px', borderRadius: 2,
                 background: 'var(--acc-bg)', color: 'var(--acc)',
                 border: '1px solid rgba(212,160,48,0.15)',
-              }}>
-                {tag}
-              </span>
+              }}>{tag}</span>
             ))}
-            {reference.tags.length > 4 && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)' }}>
-                +{reference.tags.length - 4}
-              </span>
+            {reference.tags.length > 3 && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)' }}>+{reference.tags.length - 3}</span>
             )}
           </div>
         )}
 
         <div style={{ flex: 1 }} />
 
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          paddingTop: 8, borderTop: '1px solid var(--brd)', marginTop: 4,
-        }}>
-          {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') ? (
-            <button onClick={e => { e.stopPropagation(); onRead?.(); }} style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
-              color: 'var(--acc)', background: 'var(--acc-bg)',
-              border: '1px solid rgba(212,160,48,0.25)',
-              padding: '4px 10px', borderRadius: 'var(--r-sm)', cursor: 'pointer',
-            }}>
-              <BookOpenText size={12} weight="fill" /> Ler
-            </button>
-          ) : reference.url ? (
-            <a href={reference.url} target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()} style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-                textDecoration: 'none',
-              }}>
-              <LinkSimple size={11} /> {hostnameOf(reference.url)}
-            </a>
-          ) : (
-            <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }} style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-            }}>
-              <Paperclip size={11} /> {dragOver ? 'solte aqui' : 'anexar'}
-            </button>
-          )}
+        {/* CTA */}
+        {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') && (
+          <button className="acervo-btn-ler" onClick={e => { e.stopPropagation(); onRead?.(); }} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, width: '100%',
+            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+            color: '#fff', background: 'var(--acc)', border: 'none',
+            padding: '6px 0', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+            marginTop: 6,marginBottom: 10, transition: 'all 0.12s',
+          }}>
+            <BookOpenText size={13} weight="fill" /> Ler
+          </button>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
           <div style={{ display: 'flex', gap: 2 }}>
-            <button onClick={toggleFavorite} style={cardBtnStyle} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'}>
-              <Star size={11} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
-            </button>
-            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} style={cardBtnStyle} title="editar">
-              <PencilSimple size={11} />
-            </button>
             {reference.filePath && (
-              <button onClick={e => { e.stopPropagation(); handleDownload(); }} style={cardBtnStyle} title="baixar">
+              <button onClick={e => { e.stopPropagation(); handleDownload(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="baixar">
                 <DownloadSimple size={11} />
               </button>
             )}
-            <button onClick={e => { e.stopPropagation(); onShare(); }} style={cardBtnStyle} title="compartilhar">
+            <button onClick={toggleFavorite} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="favoritar">
+              <Star size={11} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 2 }}>
+            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="editar">
+              <PencilSimple size={11} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onShare(); }} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle} title="compartilhar">
               <ShareNetwork size={11} />
             </button>
-            {folders.length > 0 && (
-              <div style={{ position: 'relative' }}>
-                <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} style={cardBtnStyle} title="pasta">
-                  <Folder size={11} />
-                </button>
-                {folderMenuOpen && (
-                  <FolderPicker folders={folders} onPick={fId => { onAddToFolder(reference.id, fId); setFolderMenuOpen(false); }} />
-                )}
-              </div>
-            )}
             <button onClick={handleDelete} title={confirmDelete ? 'confirmar' : 'excluir'} style={{
               ...cardBtnStyle,
               color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.35)',
@@ -1793,4 +1750,7 @@ const cardBtnStyle = {
   padding: '3px 5px', borderRadius: 'var(--r-sm)',
   background: 'var(--bg3)', border: '1px solid var(--brd)',
   color: 'var(--tx3)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+  transition: 'all 0.1s',
 };
+
+// Classe CSS pra hover — adicionar className="acervo-card-btn" em cada botão que usa cardBtnStyle

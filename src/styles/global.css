@@ -187,3 +187,24 @@ body.light::before {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
+/* ── Acervo button hovers ─────────────────────────────── */
+.acervo-btn:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+  transition: all 0.12s;
+}
+
+.acervo-btn-ler:hover {
+  background: var(--acc2) !important;
+  box-shadow: 0 2px 8px rgba(212,160,48,0.3);
+}
+
+.acervo-card-btn:hover {
+  background: var(--bg4) !important;
+  color: var(--tx) !important;
+  border-color: var(--brd2) !important;
+}
+
+.acervo-card-btn:active {
+  transform: scale(0.95);
+}
