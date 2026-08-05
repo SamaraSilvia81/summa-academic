@@ -491,7 +491,6 @@ export function Settings({ profileId }) {
             placeholder="http://lattes.cnpq.br/seu-id"
             style={{ width: '100%', padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--tx)', background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: 'var(--r-md)', outline: 'none' }} />
         </div>
-        <SaveBtn dirty={dirty} saving={saving} onSave={saveProfile} />
       </Section>
 
       {/* ═══ ÁREA DE PESQUISA ═══ */}
@@ -499,13 +498,11 @@ export function Settings({ profileId }) {
         <label style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Grande área</label>
         <ChipSelect options={AREAS} selected={pArea} onChange={v => { setPArea(v); markDirty(); }} />
         <FieldRow label="Subárea" value={pSubarea} onChange={v => { setPSubarea(v); markDirty(); }} placeholder="Ex: Engenharia de Software" />
-        <SaveBtn dirty={dirty} saving={saving} onSave={saveProfile} />
       </Section>
 
       {/* ═══ PALAVRAS-CHAVE ═══ */}
       <Section title="palavras-chave" icon={Sparkle}>
         <TagEditor tags={pKeywords} onAdd={kw => { setPKeywords(prev => [...prev, kw]); markDirty(); }} onRemove={i => { setPKeywords(prev => prev.filter((_, idx) => idx !== i)); markDirty(); }} placeholder="Ex: SATD, microfrontend..." />
-        <SaveBtn dirty={dirty} saving={saving} onSave={saveProfile} />
       </Section>
 
       {/* ═══ FONTES E IDIOMAS ═══ */}

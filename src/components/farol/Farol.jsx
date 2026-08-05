@@ -1,53 +1,63 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import {
-  ArrowsClockwise, BookmarkSimple, X, ArrowSquareOut,
+  ArrowsClockwise, BookmarkSimple,
   Funnel, ChartBar, Newspaper, Lightning,
-  CalendarBlank, Tag, ArrowUp, ArrowRight,
+  CalendarBlank, List
 } from '@phosphor-icons/react';
 import { useRadarItems, useRadarStats, useNotes, useRadarCfps, useRadarFetch } from '../../hooks/useData';
 import { dismissRadarItem, markRadarItemRead, toggleRadarSave } from '../../store/slices/dataSlice';
 import { keyToLabel } from '../../lib/sourcesConfig';
 
-// ── Paleta de tipos ──────────────────────────────────────────────
 const TYPE_META = {
-  paper:  { label: 'Paper',   color: '#D4A030', gradient: 'linear-gradient(135deg, #2a1d00 0%, #1a1200 60%, #0e1119 100%)' },
-  post:   { label: 'Artigo',  color: '#7B9EE0', gradient: 'linear-gradient(135deg, #0d1a2e 0%, #081424 60%, #0e1119 100%)' },
-  thread: { label: 'Thread',  color: '#A07BD4', gradient: 'linear-gradient(135deg, #1a0d2e 0%, #12081e 60%, #0e1119 100%)' },
-  cfp:    { label: 'CFP',     color: '#4ADE80', gradient: 'linear-gradient(135deg, #0d2e1a 0%, #082414 60%, #0e1119 100%)' },
-  news:   { label: 'Notícia', color: '#F87171', gradient: 'linear-gradient(135deg, #2e0d0d 0%, #240808 60%, #0e1119 100%)' },
+  paper:  { label: 'Paper',   color: '#D4A030', bg: 'rgba(212,160,48,0.15)', solid: '#1a1600' },
+  post:   { label: 'Artigo',  color: '#60A5FA', bg: 'rgba(96,165,250,0.15)', solid: '#00112a' },
+  thread: { label: 'Thread',  color: '#A78BFA', bg: 'rgba(167,139,250,0.15)', solid: '#12002a' },
+  cfp:    { label: 'CFP',     color: '#4ADE80', bg: 'rgba(74,222,128,0.15)', solid: '#001a10' },
+  news:   { label: 'Notícia', color: '#F87171', bg: 'rgba(248,113,113,0.15)', solid: '#2a0000' },
 };
 
-// ── Helpers ──────────────────────────────────────────────────────
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'dia';
-  if (h < 18) return 'tarde';
-  return 'noite';
-}
-function getWeekNumber() {
-  const d = new Date();
-  const start = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((d - start) / (7 * 24 * 60 * 60 * 1000));
-}
-function formatDate(d) {
-  if (!d) return '';
-  const dt = d instanceof Date ? d : new Date(d);
-  return dt.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-}
 function timeAgo(d) {
   if (!d) return '';
   const dt = d instanceof Date ? d : new Date(d);
   const diff = Date.now() - dt.getTime();
   const h = Math.floor(diff / 3600000);
-  if (h < 1) return 'agora';
+  if (h < 1) return 'Agora';
   if (h < 24) return `${h}h atrás`;
   const days = Math.floor(h / 24);
   if (days < 7) return `${days}d atrás`;
   return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
-// ── Componente principal ─────────────────────────────────────────
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.split(' ');
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+// Extração de imagem do item
+function getItemImage(item, type) {
+  let url = item.image || item.thumbnail || item.ogImage || item.cover || item.coverImage || null;
+
+  // Se não tem campo direto, tenta extrair do summary/content
+  if (!url) {
+    const content = item?.summary || '';
+    const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i)
+      || content.match(/(https?:\/\/[^\s"']+\.(?:png|jpg|jpeg|gif|webp|avif))/i);
+    if (imgMatch) url = imgMatch[1];
+  }
+
+  if (!url) return null;
+
+  // Proxy pra evitar CORS (Medium bloqueia direto)
+  if (!url.includes('images.weserv.nl') && !url.startsWith('data:')) {
+    url = `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=600&q=75`;
+  }
+
+  return url;
+}
+
 export function Farol({ profileId }) {
   const items    = useRadarItems(profileId);
   const stats    = useRadarStats(profileId);
@@ -56,15 +66,14 @@ export function Farol({ profileId }) {
 
   const { run: runRadarFetch, status: fetchStatus, lastFetch } = useRadarFetch(profileId);
   const isFetching = fetchStatus === 'loading';
-
   const autoFetchedFor = useRef(null);
+
   useEffect(() => {
     if (!profileId || autoFetchedFor.current === profileId) return;
     autoFetchedFor.current = profileId;
     runRadarFetch(false);
   }, [profileId, runRadarFetch]);
 
-  // ── View state ──────────────────────────────────────────────────
   const [view, setView] = useState('feed');
   const [filterType,   setFilterType]   = useState('all');
   const [filterSource, setFilterSource] = useState('all');
@@ -72,7 +81,6 @@ export function Farol({ profileId }) {
   const [sortBy,       setSortBy]       = useState('date');
   const [showFilters,  setShowFilters]  = useState(false);
 
-  // ── Consolidar todos os itens ───────────────────────────────────
   const allItems = useMemo(() => {
     const base = items || [];
     const cfpItems = (cfps || []).map(c => ({ ...c, type: c.type || 'cfp' }));
@@ -80,24 +88,16 @@ export function Farol({ profileId }) {
     return merged.filter(i => !i.isDismissed);
   }, [items, cfps]);
 
-  // Contagens por tipo para a category bar
   const typeCounts = useMemo(() => {
     const counts = {};
-    allItems.forEach(i => {
-      const t = i.type || 'outro';
-      counts[t] = (counts[t] || 0) + 1;
-    });
+    allItems.forEach(i => { const t = i.type || 'outro'; counts[t] = (counts[t] || 0) + 1; });
     return counts;
   }, [allItems]);
 
-  // Fontes únicas
-  const sourcesPresent = useMemo(() =>
-    [...new Set(allItems.map(i => i.source).filter(Boolean))], [allItems]);
-
-  // ── Filtragem + ordenação ───────────────────────────────────────
   const filtered = useMemo(() => {
     let list = allItems;
-    if (filterType !== 'all')   list = list.filter(i => i.type === filterType);
+    if (filterType === 'saved') list = list.filter(i => i.isSaved);
+    else if (filterType !== 'all') list = list.filter(i => i.type === filterType);
     if (filterSource !== 'all') list = list.filter(i => i.source === filterSource);
     if (filterDate !== 'all') {
       const now = Date.now();
@@ -120,886 +120,378 @@ export function Farol({ profileId }) {
     return list;
   }, [allItems, filterType, filterSource, filterDate, sortBy]);
 
-  const unread = filtered.filter(i => !i.isRead).length;
-  const saved  = allItems.filter(i => i.isSaved);
+  const saved = useMemo(() => allItems.filter(i => i.isSaved), [allItems]);
 
-  // ── Dashboard stats ─────────────────────────────────────────────
-  const dashStats = useMemo(() => {
-    const bySource = {};
-    const byType   = {};
-    const byDay    = {};
-    allItems.forEach(i => {
-      bySource[i.source || 'outros'] = (bySource[i.source || 'outros'] || 0) + 1;
-      byType[i.type || 'outro']      = (byType[i.type || 'outro']     || 0) + 1;
-      const day = i.publishedAt
-        ? new Date(i.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-        : 'sem data';
-      byDay[day] = (byDay[day] || 0) + 1;
-    });
-    const avgRel = allItems.length
-      ? Math.round(allItems.reduce((s, i) => s + (i.relevanceScore || 0), 0) / allItems.length)
-      : 0;
-    return { bySource, byType, byDay, avgRel };
-  }, [allItems]);
-
-  // ── Categorias pra category bar ─────────────────────────────────
-  const CATEGORY_BAR = [
-    { key: 'all',    label: 'Todos',    count: allItems.length },
-    { key: 'paper',  label: 'Papers',   count: typeCounts.paper  || 0 },
-    { key: 'thread', label: 'Threads',  count: typeCounts.thread || 0 },
-    { key: 'post',   label: 'Artigos',  count: typeCounts.post   || 0 },
-    { key: 'cfp',    label: 'CFPs',     count: typeCounts.cfp    || 0 },
-    { key: 'news',   label: 'Notícias', count: typeCounts.news   || 0 },
-  ].filter(c => c.key === 'all' || c.count > 0);
+  const CATEGORY_BAR = useMemo(() => [
+    { key: 'all', label: 'Todos', count: allItems.length },
+    { key: 'paper', label: 'Papers', count: typeCounts.paper || 0 },
+    { key: 'thread', label: 'Threads', count: typeCounts.thread || 0 },
+    { key: 'post', label: 'Artigos', count: typeCounts.post || 0 },
+    { key: 'cfp', label: 'CFPs', count: typeCounts.cfp || 0 },
+    { key: 'news', label: 'Notícias', count: typeCounts.news || 0 },
+    { key: 'saved', label: 'Favoritos', count: saved.length },
+  ].filter(c => c.key === 'all' || c.count > 0), [allItems, typeCounts, saved]);
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" style={{ background: 'transparent', padding: '0 24px 24px 24px', color: 'var(--tx)' }}>
+      <FarolHeader />
 
-      {/* ── Header tipográfico editorial ─────────────────────────── */}
-      <FarolHeader unread={unread} lastFetch={lastFetch} />
-
-      {/* ── Stats row ─────────────────────────────────────────────── */}
-      {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 14 }}>
-          <StatCard value={String(allItems.filter(i=>i.type==='paper').length).padStart(2,'0')} label="papers" />
-          <StatCard value={String(allItems.filter(i=>i.type==='thread'||i.type==='post'||i.type==='news').length).padStart(2,'0')} label="notícias" />
-          <StatCard value={String(allItems.filter(i=>i.type==='cfp').length).padStart(2,'0')} label="cfps" />
-          <StatCard value={`${dashStats.avgRel}%`} label="relevância" />
-        </div>
-      )}
-
-      {/* ── View toggle + atualizar ──────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--bg2)', borderRadius: 'var(--r-md)', padding: 3, border: '1px solid var(--brd)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg2)', borderRadius: '8px', padding: 3, border: '1px solid var(--brd)' }}>
           {[
-            { key: 'feed',      icon: Newspaper, label: 'Feed' },
-            { key: 'dashboard', icon: ChartBar,  label: 'Dashboard' },
+            { key: 'feed', icon: Newspaper, label: 'Feed' },
+            { key: 'dashboard', icon: ChartBar, label: 'Dashboard' },
           ].map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setView(key)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 12px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 12,
-              background: view === key ? 'var(--acc)' : 'transparent',
-              color:      view === key ? 'var(--bg0)' : 'var(--tx3)',
-              fontWeight: view === key ? 700 : 400, transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px',
+              borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: 12,
+              background: view === key ? 'var(--bg3)' : 'transparent',
+              color: view === key ? 'var(--tx)' : 'var(--tx2)',
+              fontWeight: view === key ? 600 : 400, transition: 'all 0.15s',
             }}>
-              <Icon size={13} weight={view === key ? 'fill' : 'regular'} />
+              <Icon size={14} weight={view === key ? 'fill' : 'regular'} />
               {label}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setShowFilters(f => !f)} style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            background: showFilters ? 'var(--acc-bg)' : 'var(--bg2)',
-            border: `1px solid ${showFilters ? 'var(--acc)' : 'var(--brd)'}`,
-            borderRadius: 'var(--r-md)', padding: '5px 10px',
-            color: showFilters ? 'var(--acc)' : 'var(--tx3)',
-            cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12,
+            background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: '8px',
+            padding: '6px 14px', color: 'var(--tx2)', cursor: 'pointer', fontSize: 12,
           }}>
-            <Funnel size={13} weight={showFilters ? 'fill' : 'regular'} />
-            Filtros
-            {(filterType !== 'all' || filterSource !== 'all' || filterDate !== 'all') && (
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acc)', display: 'inline-block' }} />
-            )}
+            <Funnel size={14} /> Filtros
           </button>
-
           <button onClick={() => runRadarFetch(true)} disabled={isFetching} style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            background: 'var(--bg2)', border: '1px solid var(--brd)',
-            borderRadius: 'var(--r-md)', padding: '5px 10px',
-            color: 'var(--tx3)', cursor: isFetching ? 'default' : 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 12,
-            opacity: isFetching ? 0.6 : 1,
+            background: isFetching ? 'var(--bg2)' : 'var(--acc)',
+            border: `1px solid ${isFetching ? 'var(--brd)' : 'var(--acc)'}`,
+            borderRadius: '8px', padding: '6px 14px',
+            color: isFetching ? 'var(--tx2)' : 'var(--bg0)',
+            cursor: isFetching ? 'default' : 'pointer', fontSize: 12, fontWeight: 600,
           }}>
-            <ArrowsClockwise size={13} className={isFetching ? 'animate-spin' : ''} />
-            {isFetching ? 'buscando...' : 'atualizar'}
+            <ArrowsClockwise size={14} className={isFetching ? 'animate-spin' : ''} />
+            {isFetching ? 'Buscando...' : 'Atualizar'}
           </button>
         </div>
       </div>
 
-      {/* ── Category bar horizontal scrollável ───────────────────── */}
-      <CategoryBar
-        categories={CATEGORY_BAR}
-        active={filterType}
-        onChange={setFilterType}
-      />
+      <CategoryBar categories={CATEGORY_BAR} active={filterType} onChange={setFilterType} />
 
-      {/* ── Painel de filtros avançados (collapse) ───────────────── */}
       {showFilters && (
-        <div style={{
-          background: 'var(--bg2)', border: '1px solid var(--brd)',
-          borderRadius: 'var(--r-xl)', padding: '14px 16px', marginBottom: 12,
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <FilterGroup label="Fonte" icon={Lightning}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: '12px', padding: '14px 16px', marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <FilterGroup label="Fonte">
               <FilterChip active={filterSource === 'all'} onClick={() => setFilterSource('all')} label="Todas" />
-              {sourcesPresent.map(s => (
-                <FilterChip key={s} active={filterSource === s}
-                  onClick={() => setFilterSource(s)} label={keyToLabel(s)} />
+              {[...new Set(allItems.map(i => i.source).filter(Boolean))].map(s => (
+                <FilterChip key={s} active={filterSource === s} onClick={() => setFilterSource(s)} label={keyToLabel(s)} />
               ))}
             </FilterGroup>
-            <FilterGroup label="Data" icon={CalendarBlank}>
-              {[
-                { key: 'all',   label: 'Qualquer' },
-                { key: 'today', label: 'Hoje' },
-                { key: 'week',  label: 'Esta semana' },
-                { key: 'month', label: 'Este mês' },
-              ].map(({ key, label }) => (
-                <FilterChip key={key} active={filterDate === key}
-                  onClick={() => setFilterDate(key)} label={label} />
-              ))}
+            <FilterGroup label="Data">
+              {[{ key: 'all', label: 'Qualquer' }, { key: 'today', label: 'Hoje' }, { key: 'week', label: 'Esta semana' }, { key: 'month', label: 'Este mês' }]
+                .map(({ key, label }) => <FilterChip key={key} active={filterDate === key} onClick={() => setFilterDate(key)} label={label} />)}
             </FilterGroup>
-            <FilterGroup label="Ordenar" icon={ArrowUp}>
-              <FilterChip active={sortBy === 'date'}      onClick={() => setSortBy('date')}      label="Mais recente" />
+            <FilterGroup label="Ordenar">
+              <FilterChip active={sortBy === 'date'} onClick={() => setSortBy('date')} label="Mais recente" />
               <FilterChip active={sortBy === 'relevance'} onClick={() => setSortBy('relevance')} label="Mais relevante" />
             </FilterGroup>
           </div>
-          {(filterType !== 'all' || filterSource !== 'all' || filterDate !== 'all') && (
-            <button onClick={() => { setFilterType('all'); setFilterSource('all'); setFilterDate('all'); }}
-              style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--tx3)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, textDecoration: 'underline' }}>
-              limpar filtros
-            </button>
-          )}
         </div>
       )}
 
-      {/* lastFetch info */}
-      {lastFetch && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginBottom: 10 }}>
-          {lastFetch.count > 0
-            ? `+${lastFetch.count} ${lastFetch.count === 1 ? 'item novo' : 'itens novos'}`
-            : 'nenhum item novo na última busca'}
-          {lastFetch.errors?.length > 0 && ` · ${lastFetch.errors.length} fonte(s) falharam`}
-        </div>
-      )}
-
-      {/* ── VIEWS ─────────────────────────────────────────────────── */}
       {view === 'feed' ? (
         <FeedView items={filtered} notes={notes} saved={saved} profileId={profileId} />
       ) : (
-        <DashboardView stats={dashStats} allItems={allItems} />
+        <DashboardView allItems={allItems} />
       )}
     </div>
   );
 }
 
-// ── Header editorial tipográfico ──────────────────────────────────
-function FarolHeader({ unread, lastFetch }) {
+function FarolHeader() {
   const now = new Date();
-  const weekNum = Math.ceil((now - new Date(now.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
-  const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-
+  const dateStr = now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   return (
-    <div style={{
-      borderBottom: '2px solid var(--tx)',
-      paddingBottom: 10,
-      marginBottom: 14,
-      marginTop: 14,
-      position: 'relative',
-    }}>
-      {/* Top line: mono metadata */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 6,
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-          textTransform: 'uppercase', letterSpacing: '0.14em',
-          color: 'var(--tx3)',
-        }}>
-          farol://radar · semana {String(weekNum).padStart(2, '0')}
-        </span>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          color: 'var(--tx3)', letterSpacing: '0.04em',
-        }}>
-          {dateStr}
-        </span>
+    <div style={{ borderBottom: '1px solid var(--brd)', marginBottom: 16, background: 'var(--bg1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 16px', background: 'var(--bg2)', borderBottom: '1px solid var(--brd)', color: 'var(--tx2)', fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Lightning size={12} weight="fill" color="var(--acc)" />
+          <span>Farol · Radar ativo</span>
+          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', marginLeft: 4 }} />
+        </div>
+        <span>{dateStr}</span>
       </div>
-
-      {/* Título principal em serif */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-        <h1 style={{
-          fontFamily: 'var(--font-quote)',
-          fontWeight: 700, fontSize: 36,
-          lineHeight: 1, letterSpacing: '-0.02em',
-          color: 'var(--tx)',
-          margin: 0,
-        }}>
-          Farol
-        </h1>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11,
-          color: 'var(--acc)', letterSpacing: '0.04em',
-        }}>
-          {unread > 0 ? `${unread} não lidos` : 'tudo em dia'}
-        </span>
+      <div style={{ padding: '40px 0 50px 0', textAlign: 'center' }}>
+        <div style={{ marginBottom: 8, fontFamily: 'var(--font-quote)', fontSize: 14, fontWeight: 700, color: 'var(--acc)', letterSpacing: '0.1em' }}>FAROL</div>
+        <h1 style={{ fontFamily: 'var(--font-quote)', fontSize: 40, fontWeight: 700, color: 'var(--tx)', margin: 0, letterSpacing: '-0.02em' }}>Radar de Inteligência Acadêmica</h1>
+        <p style={{ fontSize: 16, color: 'var(--tx2)', marginTop: 8, fontFamily: 'var(--font-body)' }}>Acompanhe as principais tendências, papers e notícias do mundo da pesquisa em tempo real.</p>
       </div>
-
-      {/* Subtítulo / tagline */}
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--tx3)', marginTop: 3,
-        letterSpacing: '0.03em',
-      }}>
-        Monitor de literatura acadêmica e comunidade de pesquisa
-      </div>
-
-      {/* Thin accent line */}
-      <div style={{
-        position: 'absolute', bottom: -2, left: 0,
-        width: 48, height: 2,
-        background: 'var(--acc)',
-      }} />
+      <div style={{ height: 1, background: 'var(--brd)', margin: '0 0 4px 0' }} />
     </div>
   );
 }
 
-// ── Category bar horizontal scrollável ───────────────────────────
 function CategoryBar({ categories, active, onChange }) {
   return (
-    <div style={{
-      overflowX: 'auto', display: 'flex', gap: 0,
-      borderBottom: '1px solid var(--brd)',
-      marginBottom: 14,
-      scrollbarWidth: 'none',
-      msOverflowStyle: 'none',
-    }}
-    className="hide-scrollbar"
-    >
-      {categories.map(({ key, label, count }, idx) => {
-        const isActive = active === key;
-        const color = TYPE_META[key]?.color || 'var(--acc)';
-        return (
-          <button key={key} onClick={() => onChange(key)} style={{
-            flexShrink: 0,
-            display: 'flex', alignItems: 'baseline', gap: 5,
-            padding: '8px 16px',
-            background: 'none', border: 'none', cursor: 'pointer',
-            borderBottom: `2px solid ${isActive ? color : 'transparent'}`,
-            marginBottom: -1,
-            transition: 'all 0.15s',
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontWeight: isActive ? 700 : 400,
-              fontSize: 12,
-              color: isActive ? color : 'var(--tx3)',
-              letterSpacing: '0.02em',
-              transition: 'color 0.15s',
-            }}>
-              {label}
-            </span>
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10,
-              color: isActive ? color : 'var(--tx3)',
-              opacity: isActive ? 0.8 : 0.5,
-              fontWeight: 700,
-            }}>
-              {count}
-            </span>
-          </button>
-        );
-      })}
+    <div style={{ overflowX: 'auto', display: 'flex', gap: 8, paddingBottom: 12, scrollbarWidth: 'none', msOverflowStyle: 'none', marginBottom: 20 }}>
+      {categories.map(({ key, label, count }) => (
+        <button key={key} onClick={() => onChange(key)} style={{
+          display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+          padding: '6px 16px', borderRadius: '20px', border: `1px solid ${active === key ? 'var(--acc)' : 'var(--brd)'}`,
+          background: active === key ? 'var(--acc-bg)' : 'var(--bg2)',
+          color: active === key ? 'var(--acc)' : 'var(--tx2)',
+          fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
+        }}>
+          <span>{label}</span>
+          <span style={{ fontSize: 11, background: active === key ? 'var(--acc)' : 'var(--bg3)', padding: '0 6px', borderRadius: '10px', color: active === key ? 'var(--bg0)' : 'var(--tx3)' }}>{count}</span>
+        </button>
+      ))}
     </div>
   );
 }
 
-// ── Feed view: grid magazine assimétrico ──────────────────────────
 function FeedView({ items, notes, saved, profileId }) {
+  const dispatch = useDispatch();
+  const [displayCount, setDisplayCount] = useState(8);
+
   if (!items || items.length === 0) {
-    return (
-      <div style={{
-        textAlign: 'center', padding: '60px 20px',
-        fontFamily: 'var(--font-mono)', color: 'var(--tx3)', fontSize: 13,
-      }}>
-        <Lightning size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-        <div>Nenhum item encontrado.</div>
-        <div style={{ fontSize: 11, marginTop: 6, opacity: 0.6 }}>
-          Ajuste os filtros ou clique em "atualizar".
-        </div>
-      </div>
-    );
+    return <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--tx3)', fontSize: 13 }}><Lightning size={32} style={{ opacity: 0.3, marginBottom: 12 }} /><div>Nenhum item encontrado no radar.</div></div>;
   }
 
-  const hero   = items[0];
-  const beside = items.slice(1, 3);   // 2 cards à direita do hero
-  const row2   = items.slice(3, 7);   // grid 2 colunas
-  const rest   = items.slice(7);      // latest news compactos
+  const handleViewMore = () => setDisplayCount(prev => prev + 6);
+  const totalItems = items.length;
+  const loadedItems = Math.min(displayCount, totalItems);
+  const hasMore = totalItems > loadedItems;
+
+  const initialItems = items.slice(0, 8);
+  const extraItems = items.slice(8, displayCount);
 
   return (
     <div>
-      {/* ── Seção principal: 2/3 + 1/3 ─────────────────────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 1fr',
-        gap: 10,
-        marginBottom: 16,
-        alignItems: 'stretch',
-      }}>
-        {/* Hero card */}
-        <HeroCard item={hero} profileId={profileId} />
-
-        {/* 2 cards empilhados à direita */}
-        {beside.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {beside.map(item => (
-              <MediumCard key={item.id} item={item} profileId={profileId} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Grid 2 colunas ─────────────────────────────────────── */}
-      {row2.length > 0 && (
-        <>
-          <Divider label="em destaque" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-            {row2.map(item => <MediumCard key={item.id} item={item} profileId={profileId} />)}
-          </div>
-        </>
-      )}
-
-      {/* ── Latest News: compactos ─────────────────────────────── */}
-      {rest.length > 0 && (
-        <>
-          <LatestNewsHeader count={rest.length} />
-          <div style={{
-            background: 'var(--bg2)', border: '1px solid var(--brd)',
-            borderRadius: 'var(--r-xl)', overflow: 'hidden', marginBottom: 16,
-          }}>
-            {rest.map((item, idx) => (
-              <CompactRow key={item.id} item={item} profileId={profileId} last={idx === rest.length - 1} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ── Reading List (salvos) ──────────────────────────────── */}
-      {saved && saved.length > 0 && (
-        <>
-          <Divider label="lista de leitura" />
-          <ReadingList items={saved} profileId={profileId} />
-        </>
-      )}
-
-      {/* ── Notas de pesquisa ─────────────────────────────────── */}
-      {notes && notes.length > 0 && (
-        <>
-          <Divider label="notas de pesquisa" />
-          {notes.slice(0, 3).map(note => <NoteCard key={note.id} note={note} />)}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Hero card com gradiente temático ─────────────────────────────
-function HeroCard({ item, profileId }) {
-  const dispatch = useDispatch();
-  const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)', gradient: 'var(--bg2)' };
-
-  const handleClick = async () => {
-    if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
-    if (item.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
-  };
-  const handleSave = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(toggleRadarSave({ profileId, id: item.id })).unwrap();
-  };
-  const handleDismiss = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(dismissRadarItem({ profileId, id: item.id })).unwrap();
-  };
-
-  return (
-    <div onClick={handleClick} style={{
-      background: typeMeta.gradient || 'var(--bg2)',
-      borderRadius: 'var(--r-xl)',
-      border: `1px solid ${typeMeta.color}28`,
-      padding: '24px 24px 20px',
-      cursor: item.sourceUrl ? 'pointer' : 'default',
-      opacity: item.isRead ? 0.7 : 1,
-      position: 'relative',
-      transition: 'border-color 0.2s, opacity 0.2s',
-      display: 'flex', flexDirection: 'column', minHeight: 260,
-    }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = typeMeta.color + '55'}
-    onMouseLeave={e => e.currentTarget.style.borderColor = typeMeta.color + '28'}
-    >
-      {/* Badge tipo + fonte */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <TypePill type={item.type} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)' }}>
-          {keyToLabel(item.source)}
-        </span>
-        {item.publishedAt && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginLeft: 'auto' }}>
-            {timeAgo(item.publishedAt)}
-          </span>
-        )}
-      </div>
-
-      {/* Título hero em serif grande */}
-      <div style={{
-        fontFamily: 'var(--font-quote)',
-        fontWeight: 700, fontSize: 22,
-        lineHeight: 1.25, marginBottom: 10,
-        color: 'var(--tx)', letterSpacing: '-0.01em',
-        flex: 1,
-      }}>
-        {item.title}
-      </div>
-
-      {/* Autores */}
-      {item.authors && (
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11,
-          color: 'var(--tx3)', marginBottom: 10,
-          letterSpacing: '0.02em',
-        }}>
-          {item.authors.split(',').slice(0, 3).join(', ')}{item.authors.split(',').length > 3 ? ' et al.' : ''}
+      {initialItems.length >= 3 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginBottom: 32 }}>
+          {initialItems.slice(0, 3).map(item => <EditorialCard key={item.id} item={item} profileId={profileId} dispatch={dispatch} />)}
         </div>
       )}
-
-      {/* Resumo */}
-      {item.summary && (
-        <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 13,
-          color: 'var(--tx2)', lineHeight: 1.6,
-          marginBottom: 16,
-          display: '-webkit-box', WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>
-          {item.summary}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <RelevanceBadge score={item.relevanceScore} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <ActionBtn onClick={handleSave} active={item.isSaved}>
-            <BookmarkSimple size={14} weight={item.isSaved ? 'fill' : 'regular'} />
-          </ActionBtn>
-          <ActionBtn onClick={handleDismiss}><X size={14} /></ActionBtn>
-          {/* Seta → canto inferior direito estilo editorial */}
-          {item.sourceUrl && (
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              border: `1px solid ${typeMeta.color}44`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: typeMeta.color, marginLeft: 4,
-            }}>
-              <ArrowRight size={13} />
+      {initialItems.length >= 6 && (
+        <div style={{ position: 'relative', marginBottom: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'var(--font-quote)', fontSize: 18, fontWeight: 700, color: 'var(--tx)' }}>
+                + Recentes <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tx2)' }}>({loadedItems} de {totalItems} itens)</span>
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--tx3)' }}>Atualizações em tempo real</span>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Card médio ────────────────────────────────────────────────────
-function MediumCard({ item, profileId }) {
-  const dispatch = useDispatch();
-  const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
-
-  const handleClick = async () => {
-    if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
-    if (item.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
-  };
-  const handleSave = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(toggleRadarSave({ profileId, id: item.id })).unwrap();
-  };
-  const handleDismiss = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(dismissRadarItem({ profileId, id: item.id })).unwrap();
-  };
-
-  return (
-    <div onClick={handleClick} style={{
-      background: 'var(--bg2)', borderRadius: 'var(--r-md)',
-      border: '1px solid var(--brd)', padding: '16px 18px',
-      cursor: item.sourceUrl ? 'pointer' : 'default',
-      opacity: item.isRead ? 0.72 : 1, transition: 'border-color 0.2s',
-      display: 'flex', flexDirection: 'column', gap: 10, flex: 1,
-    }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = typeMeta.color + '40'}
-    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--brd)'}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <TypePill type={item.type} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', marginLeft: 'auto' }}>
-          {timeAgo(item.publishedAt)}
-        </span>
-      </div>
-
-      {/* Título em serif */}
-      <div style={{
-        fontFamily: 'var(--font-quote)', fontWeight: 700,
-        fontSize: 15, lineHeight: 1.3, color: 'var(--tx)',
-        display: '-webkit-box', WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        flex: 1,
-      }}>
-        {item.title}
-      </div>
-
-      {item.authors && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)' }}>
-          {item.authors.split(',').slice(0, 2).join(', ')}{item.authors.split(',').length > 2 ? ' et al.' : ''}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+            {initialItems[3] && <LargeFeatureCard item={initialItems[3]} dispatch={dispatch} profileId={profileId} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {initialItems[4] && <SmallVerticalCard item={initialItems[4]} dispatch={dispatch} profileId={profileId} />}
+              {initialItems[5] && <SmallVerticalCard item={initialItems[5]} dispatch={dispatch} profileId={profileId} />}
+            </div>
+          </div>
         </div>
       )}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-        <RelevanceBadge score={item.relevanceScore} />
-        <div style={{ display: 'flex', gap: 3 }}>
-          <ActionBtn onClick={handleSave} active={item.isSaved}>
-            <BookmarkSimple size={13} weight={item.isSaved ? 'fill' : 'regular'} />
-          </ActionBtn>
-          <ActionBtn onClick={handleDismiss}><X size={13} /></ActionBtn>
+      {initialItems.length >= 8 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+          {initialItems[6] && <GridCard item={initialItems[6]} dispatch={dispatch} profileId={profileId} />}
+          {initialItems[7] && <GridCard item={initialItems[7]} dispatch={dispatch} profileId={profileId} />}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Latest News header ────────────────────────────────────────────
-function LatestNewsHeader({ count }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      marginBottom: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-quote)', fontWeight: 700,
-          fontSize: 15, color: 'var(--tx)',
-        }}>
-          + Mais recentes
-        </span>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
-          letterSpacing: '0.04em',
-        }}>
-          atualizações em tempo real
-        </span>
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10,
-        color: 'var(--tx3)',
-      }}>
-        {count} itens
-      </span>
-    </div>
-  );
-}
-
-// ── Linha compacta (Latest News style) ───────────────────────────
-function CompactRow({ item, profileId, last }) {
-  const dispatch = useDispatch();
-  const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
-
-  const handleClick = async () => {
-    if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
-    if (item.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
-  };
-  const handleSave = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(toggleRadarSave({ profileId, id: item.id })).unwrap();
-  };
-  const handleDismiss = async (e) => {
-    e.stopPropagation();
-    if (item.id) await dispatch(dismissRadarItem({ profileId, id: item.id })).unwrap();
-  };
-
-  return (
-    <div onClick={handleClick} style={{
-      display: 'grid', gridTemplateColumns: '1fr auto',
-      alignItems: 'center', gap: 12,
-      padding: '12px 16px',
-      borderBottom: last ? 'none' : '1px solid var(--brd)',
-      cursor: item.sourceUrl ? 'pointer' : 'default',
-      opacity: item.isRead ? 0.6 : 1, transition: 'background 0.15s',
-    }}
-    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        {!item.isRead && (
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--acc)', flexShrink: 0 }} />
-        )}
-        {item.isRead && <span style={{ width: 5, flexShrink: 0 }} />}
-
-        <TypePill type={item.type} compact />
-
-        {/* Título em serif mesmo no compact */}
-        <span style={{
-          fontFamily: 'var(--font-quote)', fontWeight: 600, fontSize: 13,
-          color: 'var(--tx)', lineHeight: 1.3,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {item.title}
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)' }}>
-          {timeAgo(item.publishedAt)}
-        </span>
-        <RelevanceBadge score={item.relevanceScore} small />
-        <ActionBtn onClick={handleSave} active={item.isSaved}>
-          <BookmarkSimple size={12} weight={item.isSaved ? 'fill' : 'regular'} />
-        </ActionBtn>
-        <ActionBtn onClick={handleDismiss}><X size={12} /></ActionBtn>
-      </div>
-    </div>
-  );
-}
-
-// ── Reading List (salvos) ─────────────────────────────────────────
-function ReadingList({ items, profileId }) {
-  const dispatch = useDispatch();
-
-  return (
-    <div style={{
-      background: 'var(--bg2)', border: '1px solid var(--acc)18',
-      borderRadius: 'var(--r-xl)', overflow: 'hidden', marginBottom: 16,
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '10px 16px 10px',
-        borderBottom: '1px solid var(--brd)',
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <BookmarkSimple size={13} weight="fill" style={{ color: 'var(--acc)' }} />
-        <span style={{
-          fontFamily: 'var(--font-quote)', fontWeight: 700,
-          fontSize: 13, color: 'var(--tx)',
-        }}>
-          Reading List
-        </span>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          color: 'var(--tx3)', marginLeft: 2,
-        }}>
-          {items.length} salvo{items.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Items compactos */}
-      {items.slice(0, 6).map((item, idx) => {
-        const typeMeta = TYPE_META[item.type] || { color: 'var(--acc)' };
-        const handleClick = async () => {
-          if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
-          if (item.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
-        };
-        const handleUnsave = async (e) => {
-          e.stopPropagation();
-          if (item.id) await dispatch(toggleRadarSave({ profileId, id: item.id })).unwrap();
-        };
-        return (
-          <div key={item.id} onClick={handleClick} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '9px 16px',
-            borderBottom: idx === Math.min(items.length, 6) - 1 ? 'none' : '1px solid var(--brd)',
-            cursor: item.sourceUrl ? 'pointer' : 'default',
-            transition: 'background 0.12s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <span style={{
-              width: 3, height: 24, borderRadius: 2,
-              background: typeMeta.color, flexShrink: 0,
-            }} />
-            <span style={{
-              fontFamily: 'var(--font-quote)', fontWeight: 600, fontSize: 12,
-              color: 'var(--tx)', flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {item.title}
-            </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', flexShrink: 0 }}>
-              {timeAgo(item.publishedAt)}
-            </span>
-            <ActionBtn onClick={handleUnsave} active>
-              <BookmarkSimple size={12} weight="fill" />
-            </ActionBtn>
+      )}
+      {extraItems.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {extraItems.map(item => <GridCard key={item.id} item={item} dispatch={dispatch} profileId={profileId} />)}
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Type pill ──────────────────────────────────────────────────────
-function TypePill({ type, compact }) {
-  const meta = TYPE_META[type] || { label: type || '?', color: 'var(--acc)' };
-  const label = compact
-    ? (meta.label || type || '').slice(0, 4).toUpperCase()
-    : meta.label;
-  return (
-    <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-      textTransform: compact ? 'uppercase' : 'none',
-      letterSpacing: compact ? '0.05em' : '0.02em',
-      padding: compact ? '1px 5px' : '2px 8px',
-      borderRadius: 3, flexShrink: 0,
-      background: meta.color + '20', color: meta.color,
-      border: `1px solid ${meta.color}30`,
-    }}>
-      {label}
-    </span>
-  );
-}
-
-// ── Dashboard view ────────────────────────────────────────────────
-function DashboardView({ stats, allItems }) {
-  const maxSource = Math.max(...Object.values(stats.bySource), 1);
-  const maxType   = Math.max(...Object.values(stats.byType), 1);
-  const recentDays = Object.entries(stats.byDay).filter(([d]) => d !== 'sem data').slice(-7);
-  const maxDay = Math.max(...recentDays.map(([,v]) => v), 1);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-        <DashCard label="Total monitorado" value={allItems.length} />
-        <DashCard label="Salvos" value={allItems.filter(i=>i.isSaved).length} accent />
-        <DashCard label="Não lidos" value={allItems.filter(i=>!i.isRead).length} />
-      </div>
-
-      <ChartPanel title="Itens por fonte">
-        {Object.entries(stats.bySource).sort((a,b)=>b[1]-a[1]).map(([src, count]) => (
-          <BarRow key={src} label={keyToLabel(src)} value={count} max={maxSource} />
-        ))}
-      </ChartPanel>
-
-      <ChartPanel title="Itens por tipo">
-        {Object.entries(stats.byType).sort((a,b)=>b[1]-a[1]).map(([type, count]) => (
-          <BarRow key={type} label={TYPE_META[type]?.label || type} value={count} max={maxType}
-            color={TYPE_META[type]?.color} />
-        ))}
-      </ChartPanel>
-
-      {recentDays.length > 0 && (
-        <ChartPanel title="Publicações recentes (últimos 7 registros)">
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80, paddingTop: 8 }}>
-            {recentDays.map(([day, count]) => (
-              <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{
-                  width: '100%', borderRadius: '3px 3px 0 0',
-                  height: `${Math.round((count / maxDay) * 64)}px`,
-                  background: 'var(--acc)', opacity: 0.75, minHeight: 4,
-                }} />
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', whiteSpace: 'nowrap' }}>
-                  {day}
-                </span>
+        </div>
+      )}
+      {hasMore && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+          <button onClick={handleViewMore} style={{ background: 'var(--bg3)', color: 'var(--tx)', border: '1px solid var(--brd2)', borderRadius: '20px', padding: '10px 28px', fontSize: 13, cursor: 'pointer', transition: 'all 0.2s', fontWeight: 500 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--acc)'; e.currentTarget.style.color = 'var(--acc)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--brd2)'; e.currentTarget.style.color = 'var(--tx)'; }}
+          >Carregar mais itens ({loadedItems} de {totalItems})</button>
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 10, paddingTop: 20, borderTop: '1px solid var(--brd)' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <BookmarkSimple size={16} color="var(--tx)" weight="fill" />
+            <span style={{ fontFamily: 'var(--font-quote)', fontWeight: 600, fontSize: 14, color: 'var(--tx)' }}>Lista de Leitura</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {saved && saved.slice(0, 4).map(item => (
+              <div key={item.id} onClick={() => { if(item.sourceUrl) window.open(item.sourceUrl, '_blank'); }} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--brd)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{item.title}</span>
+                <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>{timeAgo(item.publishedAt)}</span>
               </div>
             ))}
           </div>
-        </ChartPanel>
-      )}
+        </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Lightning size={16} color="var(--tx)" weight="fill" />
+            <span style={{ fontFamily: 'var(--font-quote)', fontWeight: 600, fontSize: 14, color: 'var(--tx)' }}>Notas de Pesquisa</span>
+          </div>
+          {notes && notes.slice(0, 2).map(n => (
+            <div key={n.id} style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--brd)', marginBottom: 8, background: 'var(--bg2)' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4, color: 'var(--tx2)', marginTop: 2 }}>NP</span>
+                <div style={{ fontSize: 13, color: 'var(--tx2)' }}>"{n.content}"</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      <ChartPanel title="Top 5 por relevância">
-        {[...allItems].sort((a,b)=>(b.relevanceScore||0)-(a.relevanceScore||0)).slice(0,5).map(item => (
-          <div key={item.id} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 0', borderBottom: '1px solid var(--brd)',
-          }}>
-            <RelevanceBadge score={item.relevanceScore} />
-            <span style={{
-              fontFamily: 'var(--font-quote)', fontSize: 13, fontWeight: 600,
-              color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              flex: 1,
-            }}>{item.title}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>
-              {keyToLabel(item.source)}
-            </span>
+function CardAuthor({ item }) {
+  const authorName = item.authors ? item.authors.split(',')[0] : 'Anônimo';
+  const authorImg = item.authorImg || item.authorAvatar || item.userAvatar || item.avatar;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {authorImg ? (
+        <img src={authorImg} alt={authorName} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--brd)' }} />
+      ) : (
+        <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--bg3)', color: 'var(--tx2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>
+          {getInitials(authorName)}
+        </span>
+      )}
+      <span style={{ fontSize: 11, color: 'var(--tx3)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{authorName}</span>
+    </div>
+  );
+}
+
+function CardRenderer({ item, isLarge, isVertical, dispatch, profileId }) {
+  const typeMeta = TYPE_META[item.type] || { label: 'Info', color: 'var(--tx2)', solid: '#111' };
+  const img = getItemImage(item, item.type);
+  const sourceLabel = keyToLabel(item.source);
+  
+  const handleClick = () => {
+    if (item.id && !item.isRead) dispatch(markRadarItemRead({ profileId, id: item.id }));
+    if (item.sourceUrl) window.open(item.sourceUrl, '_blank');
+  };
+  const handleSave = (e) => { e.stopPropagation(); dispatch(toggleRadarSave({ profileId, id: item.id })); };
+
+  let height = 280, titleSize = 18;
+  if (isLarge) { height = 340; titleSize = 24; }
+  else if (isVertical) { height = 160; titleSize = 14; }
+
+  return (
+    <div onClick={handleClick} style={{
+      position: 'relative', height: height, borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+      background: TYPE_META[item.type]?.solid || '#111',
+      transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.4)'
+    }}
+    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.6)'; }}
+    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.4)'; }}
+    >
+      {img && (
+        <img src={img} crossOrigin="anonymous" onError={(e) => e.target.style.display = 'none'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.1) 70%, transparent 100%)' }} />
+      <div style={{ position: 'absolute', top: 16, left: 16, background: 'var(--bg0)', borderRadius: '6px', padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--tx)', display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--brd2)' }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: typeMeta.color }} />
+        <span>{typeMeta.label}</span>
+        <span style={{ opacity: 0.4, margin: '0 2px' }}>•</span>
+        <span style={{ color: 'var(--tx2)', fontWeight: 400 }}>{sourceLabel}</span>
+      </div>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <CardAuthor item={item} />
+          <div onClick={handleSave} style={{ color: 'var(--tx)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 6, backdropFilter: 'blur(4px)' }}>
+            <BookmarkSimple size={16} weight={item.isSaved ? 'fill' : 'regular'} />
+          </div>
+        </div>
+        <h3 style={{ fontFamily: 'var(--font-quote)', fontSize: titleSize, fontWeight: 700, color: 'var(--tx)', margin: '8px 0 0', lineHeight: 1.2 }}>{item.title}</h3>
+        {!isVertical && <p style={{ fontSize: 13, color: 'var(--tx3)', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.summary}</p>}
+      </div>
+    </div>
+  );
+}
+
+function EditorialCard(props) { return <CardRenderer {...props} isLarge={false} isVertical={false} />; }
+function LargeFeatureCard(props) { return <CardRenderer {...props} isLarge={true} isVertical={false} />; }
+function SmallVerticalCard(props) { return <CardRenderer {...props} isLarge={false} isVertical={true} />; }
+function GridCard(props) { return <CardRenderer {...props} isLarge={false} isVertical={false} />; }
+
+function DashboardView({ allItems }) {
+  const stats = useMemo(() => {
+    const bySource = {}, byType = {};
+    const readCount = allItems.filter(i => i.isRead).length;
+    const unreadCount = allItems.filter(i => !i.isRead).length;
+    let avgRelevanceSum = 0;
+    const last7days = {};
+    allItems.forEach(i => {
+      bySource[i.source || 'outros'] = (bySource[i.source || 'outros'] || 0) + 1;
+      byType[i.type || 'outro'] = (byType[i.type || 'outro'] || 0) + 1;
+      avgRelevanceSum += (i.relevanceScore || 0);
+      const dayKey = i.publishedAt ? new Date(i.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : null;
+      if (dayKey) {
+        const today = new Date();
+        const dayDiff = Math.floor((today - new Date(i.publishedAt)) / (1000*60*60*24));
+        if (dayDiff <= 7) last7days[dayKey] = (last7days[dayKey] || 0) + 1;
+      }
+    });
+    return { bySource, byType, readCount, unreadCount, avgRel: allItems.length ? Math.round(avgRelevanceSum / allItems.length) : 0, last7days };
+  }, [allItems]);
+  const maxSource = Math.max(...Object.values(stats.bySource), 1);
+  const maxDay = Math.max(...Object.values(stats.last7days), 1);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <DashCard label="Total Monitorado" value={allItems.length} />
+        <DashCard label="Não Lidos" value={stats.unreadCount} accent />
+        <DashCard label="Já Lidos" value={stats.readCount} />
+        <DashCard label="Itens Salvos" value={allItems.filter(i => i.isSaved).length} />
+      </div>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ fontFamily: 'var(--font-quote)', fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--tx)' }}>Distribuição por Fonte</div>
+        {Object.entries(stats.bySource).sort((a,b)=>b[1]-a[1]).slice(0, 7).map(([src, count]) => (
+          <div key={src} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, fontSize: 13, color: 'var(--tx2)' }}>
+            <span style={{ width: 100, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{keyToLabel(src)}</span>
+            <div style={{ flex: 1, height: 6, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(count / maxSource) * 100}%`, background: 'var(--acc)', borderRadius: 4 }} />
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)', width: 20 }}>{count}</span>
           </div>
         ))}
-      </ChartPanel>
+      </div>
+      {Object.keys(stats.last7days).length > 0 && (
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: '12px', padding: '20px' }}>
+          <div style={{ fontFamily: 'var(--font-quote)', fontSize: 16, fontWeight: 700, marginBottom: 16, color: 'var(--tx)' }}>Atividade Recente</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6, height: 80, padding: '0 8px' }}>
+            {Object.entries(stats.last7days).sort((a,b) => new Date(a[0]) - new Date(b[0])).map(([day, count]) => (
+              <div key={day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${Math.max((count / maxDay) * 64, 4)}px`, background: 'var(--acc)', opacity: 0.75, minHeight: 4 }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', whiteSpace: 'nowrap', marginTop: 4 }}>{day}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────
-function StatCard({ value, label }) {
+function DashCard({ label, value, accent }) {
   return (
-    <div style={{
-      background: 'var(--bg2)', border: '1px solid var(--brd)',
-      borderRadius: 'var(--r-md)', padding: '10px 14px',
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 20,
-        color: 'var(--acc)', textShadow: '0 0 12px var(--acc-glow)',
-        letterSpacing: '-0.02em',
-      }}>{value}</div>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-        marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em',
-      }}>{label}</div>
+    <div style={{ background: 'var(--bg2)', border: `1px solid ${accent ? 'var(--acc)' : 'var(--brd)'}`, borderRadius: '12px', padding: '16px' }}>
+      <div style={{ fontFamily: 'var(--font-quote)', fontSize: 28, fontWeight: 800, color: accent ? 'var(--acc)' : 'var(--tx)' }}>{value}</div>
+      <div style={{ fontSize: 13, color: 'var(--tx3)', marginTop: 4 }}>{label}</div>
     </div>
   );
 }
 
-function Divider({ label }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 10px' }}>
-      <div style={{ flex: 1, height: 1, background: 'var(--brd)' }} />
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tx3)',
-      }}>{label}</span>
-      <div style={{ flex: 1, height: 1, background: 'var(--brd)' }} />
-    </div>
-  );
-}
-
-function RelevanceBadge({ score, small }) {
-  if (!score && score !== 0) return null;
-  const s = score || 0;
-  const color = s >= 75 ? '#4ADE80' : s >= 50 ? 'var(--acc)' : 'var(--tx3)';
-  return (
-    <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: small ? 10 : 12, fontWeight: 700,
-      padding: small ? '1px 4px' : '2px 7px', borderRadius: 3,
-      background: color + '18', color,
-      border: `1px dashed ${color}44`,
-    }}>{s}%</span>
-  );
-}
-
-function ActionBtn({ children, onClick, active }) {
-  return (
-    <button onClick={onClick} style={{
-      background: 'none', border: 'none', cursor: 'pointer',
-      color: active ? 'var(--acc)' : 'var(--tx3)',
-      padding: 3, display: 'flex', alignItems: 'center',
-      borderRadius: 3, transition: 'color 0.15s',
-    }}>{children}</button>
-  );
-}
-
-function FilterGroup({ label, icon: Icon, children }) {
+function FilterGroup({ label, children }) {
   return (
     <div>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.08em',
-        color: 'var(--tx3)', marginBottom: 8,
-        display: 'flex', alignItems: 'center', gap: 5,
-      }}>
-        {Icon && <Icon size={11} />}{label}
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {children}
-      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tx3)', marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>{children}</div>
     </div>
   );
 }
@@ -1007,91 +499,8 @@ function FilterGroup({ label, icon: Icon, children }) {
 function FilterChip({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      padding: '3px 9px', borderRadius: 20, fontSize: 11,
-      fontFamily: 'var(--font-mono)', cursor: 'pointer',
-      background: active ? 'var(--acc)' : 'var(--bg3)',
-      color: active ? 'var(--bg0)' : 'var(--tx3)',
-      border: `1px solid ${active ? 'var(--acc)' : 'var(--brd)'}`,
-      fontWeight: active ? 700 : 400, transition: 'all 0.12s',
+      padding: '2px 10px', borderRadius: '12px', fontSize: 11, background: active ? 'var(--tx)' : 'var(--bg3)',
+      color: active ? 'var(--bg0)' : 'var(--tx2)', border: 'none', cursor: 'pointer', fontWeight: active ? 600 : 400
     }}>{label}</button>
-  );
-}
-
-function DashCard({ label, value, accent }) {
-  return (
-    <div style={{
-      background: 'var(--bg2)', border: `1px solid ${accent ? 'rgba(212,160,48,0.3)' : 'var(--brd)'}`,
-      borderRadius: 'var(--r-md)', padding: '14px 16px', textAlign: 'center',
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 800,
-        color: accent ? 'var(--acc)' : 'var(--tx)', letterSpacing: '-0.03em',
-      }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginTop: 3 }}>{label}</div>
-    </div>
-  );
-}
-
-function ChartPanel({ title, children }) {
-  return (
-    <div style={{
-      background: 'var(--bg2)', border: '1px solid var(--brd)',
-      borderRadius: 'var(--r-xl)', padding: '16px 18px',
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.08em',
-        color: 'var(--acc)', marginBottom: 14,
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        <span style={{ width: 3, height: 10, background: 'var(--acc)', borderRadius: 1, display: 'inline-block' }} />
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function BarRow({ label, value, max, color }) {
-  const pct = Math.round((value / max) * 100);
-  const c = color || 'var(--acc)';
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx2)' }}>{label}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)', fontWeight: 700 }}>{value}</span>
-      </div>
-      <div style={{ height: 5, background: 'var(--bg3)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${pct}%`, borderRadius: 3,
-          background: c, opacity: 0.8, transition: 'width 0.4s',
-        }} />
-      </div>
-    </div>
-  );
-}
-
-function NoteCard({ note }) {
-  return (
-    <div style={{
-      background: 'var(--bg2)', borderRadius: 'var(--r-md)',
-      padding: '12px 14px', border: '1px solid var(--brd)', marginBottom: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-          background: 'var(--acc)', color: 'var(--bg0)', padding: '2px 6px', borderRadius: 3,
-        }}>NP</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)' }}>
-          {note.createdAt ? new Date(note.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : ''}
-        </span>
-      </div>
-      <div style={{
-        fontFamily: 'var(--font-quote)', fontSize: 14, lineHeight: 1.65,
-        padding: '10px 12px', background: 'var(--bg1)',
-        borderRadius: 'var(--r-md)', borderLeft: '2px solid var(--acc)',
-        fontStyle: 'italic', color: 'var(--tx)',
-      }}>{note.content}</div>
-    </div>
   );
 }

@@ -12,11 +12,12 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@reduxjs/toolkit": "^2.5.1",
-    "@supabase/supabase-js": "^2.110.1",
+    "@supabase/supabase-js": "^2.112.1",
     "@tiptap/extension-highlight": "^3.27.2",
     "@tiptap/extension-placeholder": "^3.27.2",
     "@tiptap/react": "^3.27.2",
     "@tiptap/starter-kit": "^3.27.2",
+    "@xmldom/xmldom": "^0.9.10",
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",
     "pdf-lib": "^1.17.1",

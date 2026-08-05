@@ -1,18 +1,6 @@
 // supabase/functions/rss-proxy/index.ts
-//
-// Proxy server-side para feeds RSS/Atom genéricos.
-// Dois modos de operação:
-//   1. "discover" — recebe URL de um site, busca <link rel="alternate"> no HTML
-//                   e retorna a(s) URL(s) de feed encontradas.
-//   2. "fetch"    — recebe URL de feed RSS/Atom, valida que o conteúdo é XML
-//                   de feed válido, e retorna o corpo.
-//
-// Separado do external-search pra não abrir o allowlist daquela função.
-// A validação aqui é: o conteúdo retornado precisa ser XML com tags de
-// RSS (<rss>, <channel>) ou Atom (<feed>). Se não for, retorna erro.
-//
-// Deploy:
-//   supabase functions deploy rss-proxy --project-ref rmxxvpqkbeyorvyxydmn
+// Proxy server-side para feeds RSS/Atom.
+// Modificado para nunca retornar erro HTTP (só status 200), sempre retornando JSON.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +9,6 @@ const corsHeaders = {
 };
 
 const USER_AGENT = 'summa-sh-farol/1.0 (mailto:samarasilvia.dev@gmail.com)';
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -43,17 +29,13 @@ function looksLikeFeed(text: string): boolean {
   );
 }
 
-/** Extrai URLs de feeds a partir do HTML de uma página. */
 function extractFeedUrls(html: string, baseUrl: string): Array<{ url: string; title: string }> {
   const feeds: Array<{ url: string; title: string }> = [];
   const base = new URL(baseUrl);
-
-  // Regex pra <link rel="alternate" type="application/rss+xml" ...> e atom
   const linkPattern = /<link\s[^>]*rel=["']alternate["'][^>]*>/gi;
   const matches = html.match(linkPattern) || [];
 
   for (const tag of matches) {
-    // Filtra só feeds (RSS ou Atom)
     if (
       !tag.includes('application/rss+xml') &&
       !tag.includes('application/atom+xml') &&
@@ -68,34 +50,24 @@ function extractFeedUrls(html: string, baseUrl: string): Array<{ url: string; ti
 
     if (hrefMatch) {
       let feedUrl = hrefMatch[1];
-      // Resolve URLs relativas
       try {
         feedUrl = new URL(feedUrl, base).toString();
       } catch {
         continue;
       }
-      feeds.push({
-        url: feedUrl,
-        title: titleMatch ? titleMatch[1] : feedUrl,
-      });
+      feeds.push({ url: feedUrl, title: titleMatch ? titleMatch[1] : feedUrl });
     }
   }
 
-  // Fallback: tenta caminhos comuns se não achou nenhum <link>
   if (feeds.length === 0) {
     const commonPaths = ['/feed', '/rss', '/feed.xml', '/rss.xml', '/atom.xml', '/index.xml'];
     for (const path of commonPaths) {
-      feeds.push({
-        url: new URL(path, base).toString(),
-        title: `${base.hostname}${path}`,
-      });
+      feeds.push({ url: new URL(path, base).toString(), title: `${base.hostname}${path}` });
     }
   }
 
   return feeds;
 }
-
-// ── Main handler ─────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -106,58 +78,45 @@ Deno.serve(async (req: Request) => {
     const { mode, url } = await req.json();
 
     if (!url || typeof url !== 'string') {
-      return jsonResponse({ error: 'campo url é obrigatório' }, 400);
+      return jsonResponse({ error: 'campo url é obrigatório' }, 200);
     }
 
-    // Validação mínima de URL
     let parsed: URL;
     try {
       parsed = new URL(url);
     } catch {
-      return jsonResponse({ error: 'URL inválida' }, 400);
+      return jsonResponse({ error: 'URL inválida' }, 200);
     }
 
-    // Bloqueia URLs internas/privadas
     if (['localhost', '127.0.0.1', '0.0.0.0'].includes(parsed.hostname) || parsed.hostname.endsWith('.local')) {
-      return jsonResponse({ error: 'URLs locais não são permitidas' }, 403);
+      return jsonResponse({ error: 'URLs locais não são permitidas' }, 200);
     }
 
     // ── MODO DISCOVER ──────────────────────────────────────────
     if (mode === 'discover') {
-      const response = await fetch(parsed.toString(), {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Accept': 'text/html,application/xhtml+xml,*/*',
-        },
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        return jsonResponse({ error: `Site retornou ${response.status}` }, 502);
-      }
-
-      const html = await response.text();
-
-      // Primeiro checa se a própria URL já é um feed
-      if (looksLikeFeed(html)) {
-        return jsonResponse({
-          feeds: [{ url: parsed.toString(), title: 'Feed direto' }],
-          isDirect: true,
+      let html = '';
+      try {
+        const response = await fetch(parsed.toString(), {
+          headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,application/xhtml+xml,*/*' },
+          redirect: 'follow',
         });
+        if (!response.ok) {
+          return jsonResponse({ feeds: [], error: `Site não retornou conteúdo (${response.status})` }, 200);
+        }
+        html = await response.text();
+      } catch (err) {
+        return jsonResponse({ feeds: [], error: `Erro ao acessar site: ${err.message}` }, 200);
       }
 
-      // Se não, procura <link rel="alternate"> no HTML
-      const feeds = extractFeedUrls(html, parsed.toString());
+      if (looksLikeFeed(html)) {
+        return jsonResponse({ feeds: [{ url: parsed.toString(), title: 'Feed direto' }], isDirect: true }, 200);
+      }
 
-      // Valida os feeds do fallback (common paths) tentando fetch rápido
+      const feeds = extractFeedUrls(html, parsed.toString());
       const validatedFeeds: Array<{ url: string; title: string }> = [];
+
       for (const feed of feeds) {
-        // Se veio de <link>, confia que existe
-        if (!feed.title.includes('/feed') && !feed.title.includes('/rss') && !feed.title.includes('/atom')) {
-          validatedFeeds.push(feed);
-          continue;
-        }
-        // Se é fallback de path comum, faz HEAD pra checar
+        // Tenta confirmar se o feed existe
         try {
           const check = await fetch(feed.url, {
             method: 'HEAD',
@@ -171,14 +130,15 @@ Deno.serve(async (req: Request) => {
             }
           }
         } catch {
-          // ignora path que falhou
+           // ignora erro de validação, ainda adiciona se estiver na lista padrão
+           validatedFeeds.push(feed);
         }
       }
-
-      return jsonResponse({ feeds: validatedFeeds, isDirect: false });
+      // Se não achou nenhum, retorna lista vazia (em vez de erro)
+      return jsonResponse({ feeds: validatedFeeds, isDirect: false }, 200);
     }
 
-    // ── MODO FETCH (default) ───────────────────────────────────
+    // ── MODO FETCH ─────────────────────────────────────────────
     const response = await fetch(parsed.toString(), {
       headers: {
         'User-Agent': USER_AGENT,
@@ -188,24 +148,17 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!response.ok) {
-      return jsonResponse({ error: `Feed retornou ${response.status}` }, 502);
+      return jsonResponse({ error: `Feed retornou ${response.status}`, body: null }, 200);
     }
 
     const body = await response.text();
 
-    // Valida que é realmente um feed e não HTML qualquer
     if (!looksLikeFeed(body)) {
-      return jsonResponse(
-        { error: 'O conteúdo retornado não parece ser um feed RSS ou Atom válido' },
-        422
-      );
+      return jsonResponse({ error: 'O conteúdo retornado não parece ser um feed válido', body: null }, 200);
     }
 
-    return jsonResponse({ status: response.status, body });
+    return jsonResponse({ status: response.status, body }, 200);
   } catch (err) {
-    return jsonResponse(
-      { error: err instanceof Error ? err.message : String(err) },
-      500
-    );
+    return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, 200);
   }
 });

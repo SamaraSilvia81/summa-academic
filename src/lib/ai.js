@@ -101,19 +101,101 @@ ${template !== 'free' ? `Follow ${template.toUpperCase()} guidelines.` : ''}`;
 // ── Farol: Análise de relevância ──────────────────────────────
 
 export async function analyzeRelevance(item, profile) {
-  const systemPrompt = `Você é um curador acadêmico. Analise a relevância deste item para o perfil de pesquisa.
-Responda em JSON: { "score": 0-100, "reason": "...", "matchedKeywords": ["..."] }`;
+  const areas = (profile.areas || []).join(', ');
+  const keywords = (profile.keywords || []).join(', ');
+  const ignored = (profile.ignoredTerms || []).join(', ');
+
+  const systemPrompt = `Você é um curador acadêmico especializado em filtrar literatura relevante para pesquisadores.
+
+PERFIL DO PESQUISADOR:
+- Programa: ${profile.program || 'mestrado'}
+- Instituição: ${profile.institution || 'não informada'}
+- Grande área: ${areas}
+- Subárea: ${profile.subarea || 'não informada'}
+- Palavras-chave da pesquisa: ${keywords}
+${ignored ? `- Termos IGNORADOS (reduzem relevância): ${ignored}` : ''}
+${profile.thesisTitle ? `- Título da dissertação/tese: ${profile.thesisTitle}` : ''}
+
+CRITÉRIOS DE PONTUAÇÃO (score 0-100):
+- 90-100: Diretamente sobre o tema central da pesquisa. Cita conceitos-chave, propõe soluções ou apresenta estudos empíricos no domínio exato.
+- 70-89: Muito relevante. Trata de temas adjacentes que fundamentam ou complementam a pesquisa (ex: technical debt em geral quando a pesquisa é sobre SATD em microfrontends).
+- 50-69: Moderadamente relevante. Compartilha conceitos ou metodologias mas em domínio diferente.
+- 30-49: Tangencialmente relevante. Menciona termos relacionados mas o foco é outro.
+- 0-29: Irrelevante ou fora do escopo. Tutoriais básicos, marketing, conteúdo superficial.
+
+REGRAS:
+- Posts de blog com conteúdo técnico substantivo (arquitetura, trade-offs, lições aprendidas) valem tanto quanto papers acadêmicos.
+- Tutoriais genéricos de "como fazer X" sem profundidade analítica recebem score baixo.
+- Se o item contém termos ignorados do perfil, reduza o score significativamente.
+- matchedKeywords deve listar APENAS keywords do perfil que realmente aparecem ou são diretamente abordadas no item.
+
+Responda SOMENTE em JSON válido, sem markdown:
+{ "score": <número 0-100>, "reason": "<1-2 frases explicando a pontuação>", "matchedKeywords": ["<keyword1>", "<keyword2>"] }`;
+
+  const itemContent = [
+    `Título: ${item.title}`,
+    item.authors ? `Autores: ${item.authors}` : null,
+    item.summary ? `Resumo: ${item.summary.slice(0, 600)}` : null,
+    item.type ? `Tipo: ${item.type}` : null,
+    item.source ? `Fonte: ${item.source}` : null,
+  ].filter(Boolean).join('\n');
 
   const result = await callGroq([
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: `Perfil: ${profile.areas?.join(', ')}. Keywords: ${profile.keywords?.join(', ')}.
-Item: ${item.title}. ${item.authors || ''}. ${item.summary || ''}` }
-  ], { temperature: 0.3, maxTokens: 256 });
+    { role: 'user', content: itemContent }
+  ], { temperature: 0.2, maxTokens: 256 });
 
   try {
-    return JSON.parse(result);
+    const parsed = JSON.parse(result.replace(/```json\s*|```/g, '').trim());
+    return {
+      score: Math.max(0, Math.min(100, parsed.score || 0)),
+      reason: parsed.reason || '',
+      matchedKeywords: Array.isArray(parsed.matchedKeywords) ? parsed.matchedKeywords : [],
+    };
   } catch {
-    return { score: 50, reason: result, matchedKeywords: [] };
+    return { score: 50, reason: result.slice(0, 200), matchedKeywords: [] };
+  }
+}
+
+/**
+ * Análise em lote: analisa até 5 itens numa única chamada ao Groq.
+ * Economiza requests (rate limit: 500/dia no free tier).
+ */
+export async function analyzeRelevanceBatch(items, profile) {
+  if (!items || items.length === 0) return [];
+
+  const areas = (profile.areas || []).join(', ');
+  const keywords = (profile.keywords || []).join(', ');
+
+  const systemPrompt = `Você é um curador acadêmico. Analise a relevância de cada item para este perfil de pesquisa.
+
+PERFIL: ${profile.program || 'mestrado'} em ${profile.subarea || areas} (${profile.institution || ''}).
+KEYWORDS: ${keywords}.
+
+Para cada item, pontue de 0-100:
+- 90-100: tema central da pesquisa
+- 70-89: muito relevante, tema adjacente
+- 50-69: moderadamente relevante
+- 30-49: tangencial
+- 0-29: irrelevante
+
+Responda SOMENTE em JSON válido, sem markdown:
+[{ "idx": 0, "score": <0-100>, "reason": "<1 frase>", "matchedKeywords": ["..."] }, ...]`;
+
+  const itemsList = items.slice(0, 5).map((item, i) =>
+    `[${i}] ${item.title}${item.summary ? ` — ${item.summary.slice(0, 200)}` : ''}`
+  ).join('\n');
+
+  const result = await callGroq([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: itemsList }
+  ], { temperature: 0.2, maxTokens: 512 });
+
+  try {
+    const parsed = JSON.parse(result.replace(/```json\s*|```/g, '').trim());
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
 }
 
