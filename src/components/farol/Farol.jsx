@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   ArrowsClockwise, BookmarkSimple, X, ArrowSquareOut,
@@ -17,14 +17,20 @@ const TYPE_META = {
   news:   { label: 'Notícia', color: '#F87171' },
 };
 
+// ── Metadados por fonte (cor + label + sigla pra placeholder) ────
 const SOURCE_META = {
-  arxiv:            'arXiv',
-  semantic_scholar: 'Semantic Scholar',
-  hackernews:       'Hacker News',
-  devto:            'Dev.to',
-  medium:           'Medium',
-  bluesky:          'Bluesky',
+  arxiv:            { label: 'arXiv',            color: '#B7451F', short: 'arXiv',   hasThumb: false },
+  semantic_scholar: { label: 'Semantic Scholar', color: '#1A6FBF', short: 'S2',      hasThumb: false },
+  hackernews:       { label: 'Hacker News',      color: '#FF6600', short: 'HN',      hasThumb: true  },
+  devto:            { label: 'Dev.to',           color: '#3B49DF', short: 'DEV',     hasThumb: true  },
+  medium:           { label: 'Medium',           color: '#1A8917', short: 'M',       hasThumb: true  },
+  bluesky:          { label: 'Bluesky',          color: '#0085FF', short: 'BSky',    hasThumb: true  },
+  smashing:         { label: 'Smashing Mag',     color: '#E44D26', short: 'SM',      hasThumb: true  },
 };
+
+function getSourceMeta(source) {
+  return SOURCE_META[source] || { label: source || 'outro', color: 'var(--tx3)', short: '?', hasThumb: false };
+}
 
 // ── Helpers ──────────────────────────────────────────────────────
 function getGreeting() {
@@ -55,6 +61,123 @@ function timeAgo(d) {
   return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
+// ── Cache de thumbnails (evita re-fetch na mesma sessão) ─────────
+const thumbCache = {};
+
+// Gera um SVG placeholder colorido com as iniciais da fonte
+function makePlaceholderSvg(source, title) {
+  const meta = getSourceMeta(source);
+  const color = meta.color;
+  const short = meta.short;
+  // Pega primeira palavra do título pra variar um pouco o bg
+  const seed = (title || '').charCodeAt(0) % 3;
+  const opacities = ['0.08', '0.12', '0.06'];
+  const op = opacities[seed];
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="600" height="280" viewBox="0 0 600 280">
+      <defs>
+        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="${color}" stroke-width="0.5" opacity="${op}"/>
+        </pattern>
+      </defs>
+      <rect width="600" height="280" fill="#0D1117"/>
+      <rect width="600" height="280" fill="url(#grid)"/>
+      <rect x="0" y="0" width="4" height="280" fill="${color}" opacity="0.6"/>
+      <text x="300" y="130" font-family="monospace" font-size="52" font-weight="900"
+        fill="${color}" opacity="0.18" text-anchor="middle" dominant-baseline="middle"
+        letter-spacing="-2">${short}</text>
+      <text x="300" y="178" font-family="monospace" font-size="11" font-weight="700"
+        fill="${color}" opacity="0.4" text-anchor="middle" letter-spacing="4"
+        text-transform="uppercase">${meta.label.toUpperCase()}</text>
+    </svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+}
+
+// Hook: resolve thumbnail de um item
+function useThumbnail(item) {
+  const [thumb, setThumb] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!item) return;
+
+    // Se o item já traz thumbnail direto, usa
+    if (item.thumbnail || item.image || item.og_image) {
+      setThumb(item.thumbnail || item.image || item.og_image);
+      return;
+    }
+
+    const meta = getSourceMeta(item.source);
+
+    // Fontes sem thumbnail: placeholder imediato
+    if (!meta.hasThumb || !item.sourceUrl) {
+      setThumb(makePlaceholderSvg(item.source, item.title));
+      return;
+    }
+
+    // Cache hit
+    const cacheKey = item.sourceUrl;
+    if (thumbCache[cacheKey] !== undefined) {
+      setThumb(thumbCache[cacheKey]);
+      return;
+    }
+
+    // Busca og:image via allorigins (proxy público, sem custo)
+    setLoading(true);
+    const url = `https://api.allorigins.win/get?url=${encodeURIComponent(item.sourceUrl)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    fetch(url, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        const match = data?.contents?.match(/<meta[^>]+(?:property=["']og:image["']|name=["']og:image["'])[^>]*content=["']([^"']+)["']/i)
+          || data?.contents?.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property=["']og:image["'])/i);
+        const found = match?.[1] || null;
+        thumbCache[cacheKey] = found || makePlaceholderSvg(item.source, item.title);
+        setThumb(thumbCache[cacheKey]);
+      })
+      .catch(() => {
+        const placeholder = makePlaceholderSvg(item.source, item.title);
+        thumbCache[cacheKey] = placeholder;
+        setThumb(placeholder);
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        setLoading(false);
+      });
+
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [item?.id, item?.sourceUrl, item?.source]);
+
+  return { thumb, loading };
+}
+
+// ── Source Tag visual ────────────────────────────────────────────
+function SourceTag({ source, size = 'md' }) {
+  const meta = getSourceMeta(source);
+  const pad  = size === 'sm' ? '1px 5px' : '2px 8px';
+  const fs   = size === 'sm' ? 9 : 10;
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: fs, fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      padding: pad, borderRadius: 3,
+      background: meta.color + '20', color: meta.color,
+      border: `1px solid ${meta.color}40`,
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      flexShrink: 0,
+    }}>
+      <span style={{
+        width: 5, height: 5, borderRadius: '50%',
+        background: meta.color, display: 'inline-block', flexShrink: 0,
+      }} />
+      {meta.label}
+    </span>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────
 export function Farol({ profileId }) {
   const items    = useRadarItems(profileId);
@@ -73,11 +196,11 @@ export function Farol({ profileId }) {
   }, [profileId, runRadarFetch]);
 
   // ── View state ──────────────────────────────────────────────────
-  const [view, setView] = useState('feed');      // 'feed' | 'dashboard'
+  const [view, setView] = useState('feed');
   const [filterType,   setFilterType]   = useState('all');
   const [filterSource, setFilterSource] = useState('all');
-  const [filterDate,   setFilterDate]   = useState('all'); // 'all' | 'today' | 'week' | 'month'
-  const [sortBy,       setSortBy]       = useState('date'); // 'date' | 'relevance'
+  const [filterDate,   setFilterDate]   = useState('all');
+  const [sortBy,       setSortBy]       = useState('date');
   const [showFilters,  setShowFilters]  = useState(false);
 
   // ── Consolidar todos os itens ───────────────────────────────────
@@ -88,17 +211,14 @@ export function Farol({ profileId }) {
     return merged.filter(i => !i.isDismissed);
   }, [items, cfps]);
 
-  // Fontes únicas presentes
   const sourcesPresent = useMemo(() =>
     [...new Set(allItems.map(i => i.source).filter(Boolean))], [allItems]);
 
   // ── Filtragem + ordenação ───────────────────────────────────────
   const filtered = useMemo(() => {
     let list = allItems;
-
     if (filterType !== 'all')   list = list.filter(i => i.type === filterType);
     if (filterSource !== 'all') list = list.filter(i => i.source === filterSource);
-
     if (filterDate !== 'all') {
       const now = Date.now();
       const limits = { today: 86400000, week: 604800000, month: 2592000000 };
@@ -108,7 +228,6 @@ export function Farol({ profileId }) {
         return now - t <= limit;
       });
     }
-
     if (sortBy === 'relevance') {
       list = [...list].sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
     } else {
@@ -118,13 +237,12 @@ export function Farol({ profileId }) {
         return tb - ta;
       });
     }
-
     return list;
   }, [allItems, filterType, filterSource, filterDate, sortBy]);
 
   const unread = filtered.filter(i => !i.isRead).length;
 
-  // ── Dashboard stats derivados ───────────────────────────────────
+  // ── Dashboard stats ─────────────────────────────────────────────
   const dashStats = useMemo(() => {
     const bySource = {};
     const byType   = {};
@@ -188,9 +306,8 @@ export function Farol({ profileId }) {
         </div>
       )}
 
-      {/* ── Topbar: view toggle + buscar ── */}
+      {/* ── Topbar ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        {/* Toggle Feed / Dashboard */}
         <div style={{ display: 'flex', gap: 4, background: 'var(--bg2)', borderRadius: 'var(--r-md)', padding: 3, border: '1px solid var(--brd)' }}>
           {[
             { key: 'feed',      icon: Newspaper, label: 'Feed' },
@@ -212,7 +329,6 @@ export function Farol({ profileId }) {
         </div>
 
         <div style={{ display: 'flex', gap: 6 }}>
-          {/* Filtros toggle */}
           <button onClick={() => setShowFilters(f => !f)} style={{
             display: 'flex', alignItems: 'center', gap: 5,
             background: showFilters ? 'var(--acc-bg)' : 'var(--bg2)',
@@ -224,14 +340,10 @@ export function Farol({ profileId }) {
             <Funnel size={13} weight={showFilters ? 'fill' : 'regular'} />
             Filtros
             {(filterType !== 'all' || filterSource !== 'all' || filterDate !== 'all') && (
-              <span style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: 'var(--acc)', display: 'inline-block',
-              }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acc)', display: 'inline-block' }} />
             )}
           </button>
 
-          {/* Buscar agora */}
           <button onClick={() => runRadarFetch(true)} disabled={isFetching} style={{
             display: 'flex', alignItems: 'center', gap: 5,
             background: 'var(--bg2)', border: '1px solid var(--brd)',
@@ -253,7 +365,6 @@ export function Farol({ profileId }) {
           borderRadius: 'var(--r-xl)', padding: '14px 16px', marginBottom: 12,
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-            {/* Tipo */}
             <FilterGroup label="Tipo" icon={Tag}>
               {['all', 'paper', 'post', 'thread', 'news', 'cfp'].map(t => (
                 <FilterChip key={t} active={filterType === t}
@@ -262,19 +373,15 @@ export function Farol({ profileId }) {
                 />
               ))}
             </FilterGroup>
-
-            {/* Fonte */}
             <FilterGroup label="Fonte" icon={Lightning}>
               <FilterChip active={filterSource === 'all'} onClick={() => setFilterSource('all')} label="Todas" />
               {sourcesPresent.map(s => (
                 <FilterChip key={s} active={filterSource === s}
                   onClick={() => setFilterSource(s)}
-                  label={SOURCE_META[s] || s}
+                  label={getSourceMeta(s).label}
                 />
               ))}
             </FilterGroup>
-
-            {/* Data */}
             <FilterGroup label="Data" icon={CalendarBlank}>
               {[
                 { key: 'all',   label: 'Qualquer' },
@@ -286,15 +393,11 @@ export function Farol({ profileId }) {
                   onClick={() => setFilterDate(key)} label={label} />
               ))}
             </FilterGroup>
-
-            {/* Ordenar */}
             <FilterGroup label="Ordenar" icon={ArrowUp}>
               <FilterChip active={sortBy === 'date'}      onClick={() => setSortBy('date')}      label="Mais recente" />
               <FilterChip active={sortBy === 'relevance'} onClick={() => setSortBy('relevance')} label="Mais relevante" />
             </FilterGroup>
           </div>
-
-          {/* Limpar filtros */}
           {(filterType !== 'all' || filterSource !== 'all' || filterDate !== 'all') && (
             <button onClick={() => { setFilterType('all'); setFilterSource('all'); setFilterDate('all'); }}
               style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--tx3)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, textDecoration: 'underline' }}>
@@ -324,7 +427,7 @@ export function Farol({ profileId }) {
   );
 }
 
-// ── Feed view: layout NYT ────────────────────────────────────────
+// ── Feed view ────────────────────────────────────────────────────
 function FeedView({ items, notes, profileId }) {
   if (!items || items.length === 0) {
     return (
@@ -341,30 +444,33 @@ function FeedView({ items, notes, profileId }) {
     );
   }
 
-  const hero    = items[0];
-  const second  = items.slice(1, 3);
-  const rest    = items.slice(3);
+  const hero   = items[0];
+  const second = items.slice(1, 3);
+  const rest   = items.slice(3);
 
   return (
     <div>
       {/* ── HERO ── */}
       <HeroCard item={hero} profileId={profileId} />
 
-      {/* ── Linha divisória com título de seção ── */}
-      <Divider label="em destaque" />
-
-      {/* ── 2 cards médios lado a lado ── */}
+      {/* ── 2 cards médios ── */}
       {second.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          {second.map(item => <MediumCard key={item.id} item={item} profileId={profileId} />)}
-        </div>
+        <>
+          <Divider label="em destaque" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+            {second.map(item => <MediumCard key={item.id} item={item} profileId={profileId} />)}
+          </div>
+        </>
       )}
 
-      {/* ── Divisória + lista compacta do restante ── */}
+      {/* ── Lista compacta ── */}
       {rest.length > 0 && (
         <>
           <Divider label={`mais ${rest.length} item${rest.length !== 1 ? 's' : ''}`} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{
+            background: 'var(--bg2)', border: '1px solid var(--brd)',
+            borderRadius: 'var(--r-xl)', overflow: 'hidden',
+          }}>
             {rest.map((item, idx) => (
               <CompactRow key={item.id} item={item} profileId={profileId} last={idx === rest.length - 1} />
             ))}
@@ -383,10 +489,11 @@ function FeedView({ items, notes, profileId }) {
   );
 }
 
-// ── Hero card (manchete grande) ──────────────────────────────────
+// ── Hero card ────────────────────────────────────────────────────
 function HeroCard({ item, profileId }) {
-  const dispatch = useDispatch();
-  const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
+  const dispatch  = useDispatch();
+  const typeMeta  = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
+  const { thumb } = useThumbnail(item);
 
   const handleClick = async () => {
     if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
@@ -404,72 +511,92 @@ function HeroCard({ item, profileId }) {
   return (
     <div onClick={handleClick} style={{
       background: 'var(--bg2)', borderRadius: 'var(--r-xl)',
-      border: '1px solid var(--brd)', padding: '20px 22px',
+      border: '1px solid var(--brd)',
       cursor: item.sourceUrl ? 'pointer' : 'default',
       marginBottom: 10, opacity: item.isRead ? 0.72 : 1,
-      position: 'relative', transition: 'border-color 0.2s',
-      borderLeft: `3px solid ${typeMeta.color}`,
+      overflow: 'hidden', transition: 'border-color 0.2s',
     }}
     onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(212,160,48,0.4)'}
     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--brd)'}
     >
-      {/* Badge tipo + fonte + data */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-          padding: '2px 8px', borderRadius: 3,
-          background: typeMeta.color + '22', color: typeMeta.color,
-        }}>{typeMeta.label}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)' }}>
-          {SOURCE_META[item.source] || item.source}
-        </span>
+      {/* Imagem de destaque */}
+      <div style={{
+        width: '100%', height: 200, overflow: 'hidden',
+        position: 'relative', flexShrink: 0,
+        background: 'var(--bg1)',
+      }}>
+        {thumb && (
+          <img src={thumb} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => { e.target.src = makePlaceholderSvg(item.source, item.title); }}
+          />
+        )}
+        {/* Overlay gradient na imagem */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to top, rgba(4,7,13,0.85) 0%, rgba(4,7,13,0.1) 60%)',
+        }} />
+        {/* Source tag sobre a imagem */}
+        <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            padding: '2px 8px', borderRadius: 3,
+            background: typeMeta.color + 'dd', color: '#fff',
+          }}>{typeMeta.label}</span>
+          <SourceTagOverlay source={item.source} />
+        </div>
+        {/* Ações no canto direito */}
+        <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4 }}>
+          <ActionBtnOverlay onClick={handleSave} active={item.isSaved}>
+            <BookmarkSimple size={14} weight={item.isSaved ? 'fill' : 'regular'} />
+          </ActionBtnOverlay>
+          <ActionBtnOverlay onClick={handleDismiss}>
+            <X size={14} />
+          </ActionBtnOverlay>
+        </div>
+        {/* Tempo no canto inferior direito da imagem */}
         {item.publishedAt && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginLeft: 'auto' }}>
-            {timeAgo(item.publishedAt)}
-          </span>
+          <span style={{
+            position: 'absolute', bottom: 10, right: 10,
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.6)',
+          }}>{timeAgo(item.publishedAt)}</span>
         )}
       </div>
 
-      {/* Título hero */}
-      <div style={{
-        fontFamily: 'var(--font-display)', fontWeight: 800,
-        fontSize: 20, lineHeight: 1.3, marginBottom: 10, color: 'var(--tx)',
-        letterSpacing: '-0.02em',
-      }}>
-        {item.title}
-      </div>
-
-      {/* Autores */}
-      {item.authors && (
-        <div style={{ fontSize: 13, color: 'var(--tx3)', marginBottom: 10, fontFamily: 'var(--font-mono)' }}>
-          {item.authors}
-        </div>
-      )}
-
-      {/* Resumo */}
-      {item.summary && (
+      {/* Conteúdo abaixo da imagem */}
+      <div style={{ padding: '16px 20px 14px' }}>
         <div style={{
-          fontSize: 14, color: 'var(--tx2)', lineHeight: 1.65,
-          marginBottom: 14,
-          display: '-webkit-box', WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          fontFamily: 'var(--font-display)', fontWeight: 800,
+          fontSize: 20, lineHeight: 1.3, marginBottom: 8, color: 'var(--tx)',
+          letterSpacing: '-0.02em',
         }}>
-          {item.summary}
+          {item.title}
         </div>
-      )}
 
-      {/* Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <RelevanceBadge score={item.relevanceScore} />
-          {item.sourceUrl && <ArrowSquareOut size={13} style={{ color: 'var(--tx3)', opacity: 0.5 }} />}
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <ActionBtn onClick={handleSave} active={item.isSaved}>
-            <BookmarkSimple size={14} weight={item.isSaved ? 'fill' : 'regular'} />
-          </ActionBtn>
-          <ActionBtn onClick={handleDismiss}><X size={14} /></ActionBtn>
+        {item.authors && (
+          <div style={{ fontSize: 13, color: 'var(--tx3)', marginBottom: 8, fontFamily: 'var(--font-mono)' }}>
+            {item.authors}
+          </div>
+        )}
+
+        {item.summary && (
+          <div style={{
+            fontSize: 14, color: 'var(--tx2)', lineHeight: 1.65,
+            marginBottom: 12,
+            display: '-webkit-box', WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {item.summary}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RelevanceBadge score={item.relevanceScore} />
+            {item.sourceUrl && <ArrowSquareOut size={13} style={{ color: 'var(--tx3)', opacity: 0.5 }} />}
+          </div>
+          <SourceTag source={item.source} />
         </div>
       </div>
     </div>
@@ -478,8 +605,9 @@ function HeroCard({ item, profileId }) {
 
 // ── Card médio (2 colunas) ────────────────────────────────────────
 function MediumCard({ item, profileId }) {
-  const dispatch = useDispatch();
-  const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
+  const dispatch  = useDispatch();
+  const typeMeta  = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
+  const { thumb } = useThumbnail(item);
 
   const handleClick = async () => {
     if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
@@ -497,57 +625,80 @@ function MediumCard({ item, profileId }) {
   return (
     <div onClick={handleClick} style={{
       background: 'var(--bg2)', borderRadius: 'var(--r-md)',
-      border: '1px solid var(--brd)', padding: '14px 16px',
+      border: '1px solid var(--brd)',
       cursor: item.sourceUrl ? 'pointer' : 'default',
       opacity: item.isRead ? 0.72 : 1, transition: 'border-color 0.2s',
-      display: 'flex', flexDirection: 'column', gap: 8,
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}
     onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(212,160,48,0.3)'}
     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--brd)'}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* Thumbnail */}
+      <div style={{ height: 130, overflow: 'hidden', position: 'relative', background: 'var(--bg1)', flexShrink: 0 }}>
+        {thumb && (
+          <img src={thumb} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            onError={e => { e.target.src = makePlaceholderSvg(item.source, item.title); }}
+          />
+        )}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to top, rgba(4,7,13,0.7) 0%, rgba(4,7,13,0) 55%)',
+        }} />
+        {/* Type badge */}
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+          position: 'absolute', top: 8, left: 8,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
           textTransform: 'uppercase', padding: '1px 6px', borderRadius: 2,
-          background: typeMeta.color + '22', color: typeMeta.color,
+          background: typeMeta.color + 'dd', color: '#fff',
         }}>{typeMeta.label}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginLeft: 'auto' }}>
-          {timeAgo(item.publishedAt)}
-        </span>
-      </div>
-
-      <div style={{
-        fontFamily: 'var(--font-display)', fontWeight: 700,
-        fontSize: 15, lineHeight: 1.35, color: 'var(--tx)',
-        display: '-webkit-box', WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical', overflow: 'hidden',
-      }}>
-        {item.title}
-      </div>
-
-      {item.authors && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)' }}>
-          {item.authors.split(',').slice(0, 2).join(', ')}{item.authors.split(',').length > 2 ? ' et al.' : ''}
+        {/* Actions */}
+        <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 3 }}>
+          <ActionBtnOverlay onClick={handleSave} active={item.isSaved} small>
+            <BookmarkSimple size={12} weight={item.isSaved ? 'fill' : 'regular'} />
+          </ActionBtnOverlay>
+          <ActionBtnOverlay onClick={handleDismiss} small>
+            <X size={12} />
+          </ActionBtnOverlay>
         </div>
-      )}
+      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-        <RelevanceBadge score={item.relevanceScore} />
-        <div style={{ display: 'flex', gap: 3 }}>
-          <ActionBtn onClick={handleSave} active={item.isSaved}>
-            <BookmarkSimple size={13} weight={item.isSaved ? 'fill' : 'regular'} />
-          </ActionBtn>
-          <ActionBtn onClick={handleDismiss}><X size={13} /></ActionBtn>
+      {/* Conteúdo */}
+      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700,
+          fontSize: 14, lineHeight: 1.35, color: 'var(--tx)',
+          display: '-webkit-box', WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {item.title}
+        </div>
+
+        {item.authors && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)' }}>
+            {item.authors.split(',').slice(0, 2).join(', ')}{item.authors.split(',').length > 2 ? ' et al.' : ''}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+          <RelevanceBadge score={item.relevanceScore} small />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)' }}>
+              {timeAgo(item.publishedAt)}
+            </span>
+            <SourceTag source={item.source} size="sm" />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Linha compacta (lista) ────────────────────────────────────────
+// ── Linha compacta ─────────────────────────────────────────────
 function CompactRow({ item, profileId, last }) {
   const dispatch = useDispatch();
   const typeMeta = TYPE_META[item.type] || { label: item.type, color: 'var(--acc)' };
+  const srcMeta  = getSourceMeta(item.source);
 
   const handleClick = async () => {
     if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
@@ -568,27 +719,38 @@ function CompactRow({ item, profileId, last }) {
       alignItems: 'center', gap: 12,
       padding: '11px 14px',
       borderBottom: last ? 'none' : '1px solid var(--brd)',
-      background: 'var(--bg2)',
-      borderRadius: last ? '0 0 var(--r-md) var(--r-md)' : 0,
       cursor: item.sourceUrl ? 'pointer' : 'default',
       opacity: item.isRead ? 0.65 : 1, transition: 'background 0.15s',
     }}
     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-    onMouseLeave={e => e.currentTarget.style.background = 'var(--bg2)'}
+    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         {/* Dot unread */}
-        {!item.isRead && (
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acc)', flexShrink: 0 }} />
-        )}
-        {item.isRead && <span style={{ width: 6, flexShrink: 0 }} />}
+        {!item.isRead
+          ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acc)', flexShrink: 0 }} />
+          : <span style={{ width: 6, flexShrink: 0 }} />
+        }
 
+        {/* Type tag */}
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
           padding: '1px 5px', borderRadius: 2, flexShrink: 0,
           background: typeMeta.color + '22', color: typeMeta.color,
         }}>{(TYPE_META[item.type]?.label || item.type || '').slice(0, 4).toUpperCase()}</span>
 
+        {/* Source dot + label */}
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 3,
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+          color: srcMeta.color, flexShrink: 0,
+          letterSpacing: '0.04em',
+        }}>
+          <span style={{ width: 4, height: 4, borderRadius: '50%', background: srcMeta.color, display: 'inline-block' }} />
+          {srcMeta.short}
+        </span>
+
+        {/* Título */}
         <span style={{
           fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13,
           color: 'var(--tx)', lineHeight: 1.3,
@@ -614,30 +776,25 @@ function CompactRow({ item, profileId, last }) {
 function DashboardView({ stats, allItems }) {
   const maxSource = Math.max(...Object.values(stats.bySource), 1);
   const maxType   = Math.max(...Object.values(stats.byType), 1);
-
   const recentDays = Object.entries(stats.byDay)
-    .filter(([d]) => d !== 'sem data')
-    .slice(-7);
+    .filter(([d]) => d !== 'sem data').slice(-7);
   const maxDay = Math.max(...recentDays.map(([,v]) => v), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-      {/* Métricas rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
         <DashCard label="Total monitorado" value={allItems.length} />
         <DashCard label="Salvos" value={allItems.filter(i=>i.isSaved).length} accent />
         <DashCard label="Não lidos" value={allItems.filter(i=>!i.isRead).length} />
       </div>
 
-      {/* Por fonte */}
       <ChartPanel title="Itens por fonte">
         {Object.entries(stats.bySource).sort((a,b)=>b[1]-a[1]).map(([src, count]) => (
-          <BarRow key={src} label={SOURCE_META[src] || src} value={count} max={maxSource} />
+          <BarRow key={src} label={getSourceMeta(src).label} value={count} max={maxSource}
+            color={getSourceMeta(src).color} />
         ))}
       </ChartPanel>
 
-      {/* Por tipo */}
       <ChartPanel title="Itens por tipo">
         {Object.entries(stats.byType).sort((a,b)=>b[1]-a[1]).map(([type, count]) => (
           <BarRow key={type} label={TYPE_META[type]?.label || type} value={count} max={maxType}
@@ -645,7 +802,6 @@ function DashboardView({ stats, allItems }) {
         ))}
       </ChartPanel>
 
-      {/* Timeline recente */}
       {recentDays.length > 0 && (
         <ChartPanel title="Publicações recentes (últimos 7 registros)">
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80, paddingTop: 8 }}>
@@ -665,7 +821,6 @@ function DashboardView({ stats, allItems }) {
         </ChartPanel>
       )}
 
-      {/* Top relevância */}
       <ChartPanel title="Top 5 por relevância">
         {[...allItems].sort((a,b)=>(b.relevanceScore||0)-(a.relevanceScore||0)).slice(0,5).map(item => (
           <div key={item.id} style={{
@@ -678,9 +833,7 @@ function DashboardView({ stats, allItems }) {
               color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               flex: 1,
             }}>{item.title}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>
-              {SOURCE_META[item.source] || item.source}
-            </span>
+            <SourceTag source={item.source} size="sm" />
           </div>
         ))}
       </ChartPanel>
@@ -710,15 +863,11 @@ function StatCard({ value, label }) {
 
 function Divider({ label }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      margin: '14px 0 10px',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 10px' }}>
       <div style={{ flex: 1, height: 1, background: 'var(--brd)' }} />
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.1em',
-        color: 'var(--tx3)',
+        textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--tx3)',
       }}>{label}</span>
       <div style={{ flex: 1, height: 1, background: 'var(--brd)' }} />
     </div>
@@ -750,6 +899,41 @@ function ActionBtn({ children, onClick, active }) {
   );
 }
 
+// Botão de ação sobre imagem (fundo escuro semitransparente)
+function ActionBtnOverlay({ children, onClick, active, small }) {
+  return (
+    <button onClick={onClick} style={{
+      background: 'rgba(4,7,13,0.65)', border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 4, cursor: 'pointer',
+      color: active ? 'var(--acc)' : 'rgba(255,255,255,0.75)',
+      padding: small ? 3 : 4, display: 'flex', alignItems: 'center',
+      backdropFilter: 'blur(4px)', transition: 'color 0.15s',
+    }}>{children}</button>
+  );
+}
+
+// Source tag para usar sobre imagens (fundo semitransparente)
+function SourceTagOverlay({ source }) {
+  const meta = getSourceMeta(source);
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      padding: '2px 7px', borderRadius: 3,
+      background: 'rgba(4,7,13,0.7)', color: meta.color,
+      border: `1px solid ${meta.color}50`,
+      backdropFilter: 'blur(4px)',
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+    }}>
+      <span style={{
+        width: 4, height: 4, borderRadius: '50%',
+        background: meta.color, display: 'inline-block',
+      }} />
+      {meta.label}
+    </span>
+  );
+}
+
 function FilterGroup({ label, icon: Icon, children }) {
   return (
     <div>
@@ -761,9 +945,7 @@ function FilterGroup({ label, icon: Icon, children }) {
       }}>
         {Icon && <Icon size={11} />}{label}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {children}
-      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>{children}</div>
     </div>
   );
 }
