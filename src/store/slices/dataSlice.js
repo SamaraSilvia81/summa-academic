@@ -12,6 +12,7 @@ import {
 } from '../../services/repositories';
 import { uploadReferenceFile, deleteReferenceFile } from '../../lib/storage';
 import { runRadarFetch } from '../../services/radarFetch';
+import { getDefaultInterval } from '../../lib/sourcesConfig';
 
 const ALL = '__all__';
 const ROOT = '__root__';
@@ -98,7 +99,7 @@ export const fetchRadarUpdates = createAsyncThunk(
           url: null,
           isActive: true,
           lastFetchedAt: update.lastFetchedAt,
-          fetchIntervalMinutes: 1440,
+          fetchIntervalMinutes: getDefaultInterval(update.key),
         });
       }
     }

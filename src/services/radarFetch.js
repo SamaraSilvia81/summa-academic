@@ -21,6 +21,7 @@
  */
 import { analyzeRelevance, hasGroqKey } from '../lib/ai';
 import { supabase } from '../lib/supabase';
+import { getDefaultInterval, isSourceActive, keyToLabel } from '../lib/sourcesConfig';
 
 /** Busca uma URL externa via Edge Function (evita bloqueio de CORS do
  *  navegador, já que export.arxiv.org e api.semanticscholar.org não
@@ -55,18 +56,7 @@ export function normalizeSourceKey(raw) {
   return n.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-const SOURCE_LABELS = {
-  arxiv: 'arXiv',
-  semantic_scholar: 'Semantic Scholar',
-  ieee: 'IEEE Xplore',
-  acm: 'ACM Digital Library',
-  twitter: 'Twitter / X',
-  google_scholar: 'Google Scholar',
-  bluesky:          'Bluesky',
-  medium: 'Medium',
-  devto: 'Dev.to',
-  hackernews: 'Hacker News',
-};
+// Labels agora vêm de sourcesConfig.js via keyToLabel()
 
 // ── Fetchers ──────────────────────────────────────────────────────
 
@@ -272,6 +262,101 @@ const SOURCE_FETCHERS = {
   bluesky: fetchBluesky,
 };
 
+// ── RSS genérico ────────────────────────────────────────────────
+
+/** Busca um feed RSS/Atom via a Edge Function rss-proxy (modo fetch).
+ *  Diferente do fetchViaProxy (que usa external-search com allowlist),
+ *  esta aceita qualquer host mas valida que o conteúdo é feed XML. */
+async function fetchRssViaProxy(feedUrl) {
+  const { data, error } = await supabase.functions.invoke('rss-proxy', {
+    body: { mode: 'fetch', url: feedUrl },
+  });
+  if (error) throw new Error(`rss-proxy: ${error.message}`);
+  if (data?.error) throw new Error(`rss-proxy: ${data.error}`);
+  return data.body;
+}
+
+/** Descobre feed(s) RSS/Atom a partir de uma URL de site qualquer.
+ *  Retorna array de { url, title }. */
+export async function discoverRssFeeds(siteUrl) {
+  const { data, error } = await supabase.functions.invoke('rss-proxy', {
+    body: { mode: 'discover', url: siteUrl },
+  });
+  if (error) throw new Error(`rss-proxy discover: ${error.message}`);
+  if (data?.error) throw new Error(`rss-proxy discover: ${data.error}`);
+  return {
+    feeds: data.feeds || [],
+    isDirect: data.isDirect || false,
+  };
+}
+
+/** Parser genérico de feed RSS/Atom. Recebe XML string, retorna items
+ *  normalizados no mesmo formato que os outros fetchers. */
+function parseRssFeed(xml, sourceKey) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+
+  // Tenta RSS 2.0 primeiro (<rss><channel><item>)
+  const rssItems = doc.querySelectorAll('item');
+  if (rssItems.length > 0) {
+    return Array.from(rssItems).slice(0, 20).map((item) => {
+      const title = item.querySelector('title')?.textContent?.trim() || 'Sem título';
+      const link = item.querySelector('link')?.textContent?.trim() || null;
+      const creator =
+        item.getElementsByTagNameNS('*', 'creator')[0]?.textContent?.trim() || null;
+      const author = item.querySelector('author')?.textContent?.trim() || creator;
+      const pubDate = item.querySelector('pubDate')?.textContent?.trim() || null;
+      const descRaw = item.querySelector('description')?.textContent || '';
+      const summary = descRaw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+
+      return {
+        title,
+        type: 'post',
+        sourceUrl: link,
+        authors: author,
+        summary,
+        language: null, // RSS geralmente não indica idioma por item
+        publishedAt: pubDate ? new Date(pubDate) : null,
+      };
+    });
+  }
+
+  // Tenta Atom (<feed><entry>)
+  const atomEntries = doc.querySelectorAll('entry');
+  if (atomEntries.length > 0) {
+    return Array.from(atomEntries).slice(0, 20).map((entry) => {
+      const title = entry.querySelector('title')?.textContent?.trim() || 'Sem título';
+      const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
+      const link = linkEl?.getAttribute('href') || null;
+      const author = entry.querySelector('author > name')?.textContent?.trim() || null;
+      const published = entry.querySelector('published')?.textContent?.trim()
+        || entry.querySelector('updated')?.textContent?.trim() || null;
+      const summaryEl = entry.querySelector('summary') || entry.querySelector('content');
+      const summaryRaw = summaryEl?.textContent || '';
+      const summary = summaryRaw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+
+      return {
+        title,
+        type: 'post',
+        sourceUrl: link,
+        authors: author,
+        summary,
+        language: null,
+        publishedAt: published ? new Date(published) : null,
+      };
+    });
+  }
+
+  return [];
+}
+
+/** Fetcher pra uma fonte RSS customizada. Diferente dos outros fetchers,
+ *  este recebe a URL do feed diretamente (da row.url na tabela sources)
+ *  em vez de construir a query a partir do perfil. */
+async function fetchCustomRss(feedUrl, sourceKey) {
+  const xml = await fetchRssViaProxy(feedUrl);
+  return parseRssFeed(xml, sourceKey);
+}
+
 // ── Relevância (fallback sem IA) ─────────────────────────────────
 
 function heuristicScore(candidate, profile) {
@@ -340,6 +425,7 @@ export async function runRadarFetch({ profile, sourceRows = [], existingItems = 
   const errors = [];
   const skipped = [];
 
+  // ── 1. Fontes com fetcher nativo (profile.sources) ────────────
   for (const key of new Set(enabledKeys)) {
     const fetcher = SOURCE_FETCHERS[key];
     const row = sourceRows.find((s) => normalizeSourceKey(s.name) === key);
@@ -350,7 +436,7 @@ export async function runRadarFetch({ profile, sourceRows = [], existingItems = 
     }
     if (row && row.isActive === false) continue;
 
-    const intervalMs = (row?.fetchIntervalMinutes || 1440) * 60000;
+    const intervalMs = (row?.fetchIntervalMinutes || getDefaultInterval(key)) * 60000;
     const lastFetched = row?.lastFetchedAt ? new Date(row.lastFetchedAt).getTime() : 0;
     if (!force && now - lastFetched < intervalMs) continue;
 
@@ -391,12 +477,70 @@ export async function runRadarFetch({ profile, sourceRows = [], existingItems = 
 
       sourceUpdates.push({
         key,
-        name: row?.name || SOURCE_LABELS[key] || key,
+        name: row?.name || keyToLabel(key),
         existingRowId: row?.id || null,
         lastFetchedAt: new Date(),
       });
     } catch (err) {
-      errors.push({ source: SOURCE_LABELS[key] || key, message: err.message });
+      errors.push({ source: keyToLabel(key), message: err.message });
+    }
+  }
+
+  // ── 2. Fontes RSS customizadas (rows com type='rss' e url) ────
+  const rssRows = sourceRows.filter(
+    (s) => s.type === 'rss' && s.url && s.isActive !== false
+  );
+
+  for (const row of rssRows) {
+    const intervalMs = (row.fetchIntervalMinutes || 360) * 60000;
+    const lastFetched = row.lastFetchedAt ? new Date(row.lastFetchedAt).getTime() : 0;
+    if (!force && now - lastFetched < intervalMs) continue;
+
+    const sourceKey = normalizeSourceKey(row.name) || `rss_${row.id}`;
+
+    try {
+      const raw = await fetchCustomRss(row.url, sourceKey);
+
+      for (const candidate of raw) {
+        if (newItems.length >= maxNewItems) break;
+        if (!passesLanguageFilter(candidate, profile)) continue;
+
+        const dedupeKey = candidate.sourceUrl || normalizeTitle(candidate.title);
+        if (existingKeys.has(dedupeKey)) continue;
+
+        const scored = await scoreCandidate(candidate, profile);
+        if (!scored) continue;
+
+        existingKeys.add(dedupeKey);
+        newItems.push({
+          profileId: profile.id,
+          title: candidate.title,
+          type: candidate.type,
+          source: sourceKey,
+          sourceUrl: candidate.sourceUrl || null,
+          authors: candidate.authors,
+          summary: candidate.summary,
+          relevanceScore: scored.score,
+          relevanceReason: scored.reason,
+          matchedKeywords: scored.matchedKeywords,
+          language: candidate.language || null,
+          deadline: null,
+          isRead: false,
+          isSaved: false,
+          isDismissed: false,
+          fetchedAt: new Date(),
+          publishedAt: candidate.publishedAt || null,
+        });
+      }
+
+      sourceUpdates.push({
+        key: sourceKey,
+        name: row.name,
+        existingRowId: row.id,
+        lastFetchedAt: new Date(),
+      });
+    } catch (err) {
+      errors.push({ source: row.name, message: err.message });
     }
   }
 

@@ -5,6 +5,7 @@ import { createProfile } from '../../store/slices/authSlice';
 import { loadSettings } from '../../store/slices/dataSlice';
 
 import styles from './Onboarding.module.css';
+import { SOURCES, labelToKey } from '../../lib/sourcesConfig';
 
 const AREAS = [
   'Ciências Exatas e da Terra',
@@ -18,7 +19,6 @@ const AREAS = [
 ];
 
 const PROGRAMS = ['Mestrado', 'Doutorado', 'Pós-doc', 'Graduação', 'Independente'];
-const SOURCES_LIST = ['Semantic Scholar', 'arXiv', 'IEEE Xplore', 'ACM', 'Twitter / X', 'Google Scholar'];
 const LANGS = ['Português', 'English', 'Español', 'Français', '日本語'];
 
 export function Onboarding({ onComplete }) {
@@ -37,7 +37,7 @@ export function Onboarding({ onComplete }) {
     institution: '',
     advisor: '',
     keywords: [],
-    sources: ['Semantic Scholar', 'arXiv'],
+    sources: ['Semantic Scholar', 'arXiv', 'Hacker News'],
     languages: ['Português', 'English'],
   });
 
@@ -99,9 +99,7 @@ export function Onboarding({ onComplete }) {
                 ? 'fr'
                 : 'ja'
             ),
-            sources: data.sources.map((s) =>
-              s.toLowerCase().replace(/ \/ /g, '_').replace(/ /g, '_')
-            ),
+            sources: data.sources.map((s) => labelToKey(s)),
             currentProduction: data.program === 'Mestrado' ? 'dissertacao' : 'artigo',
             mainDeadline: null,
             onboardingCompleted: true,
@@ -258,17 +256,49 @@ export function Onboarding({ onComplete }) {
     <>
       <div className={styles.field}>
         <label className={styles.label}>Fontes do Farol</label>
-        <div className={styles.chips}>
-          {SOURCES_LIST.map((s) => (
-            <button
-              key={s}
-              className={`${styles.chip} ${data.sources.includes(s) ? styles.chipOn : ''}`}
-              onClick={() => toggleMulti('sources', s)}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+
+        {/* Fontes agrupadas por categoria */}
+        {[
+          { cat: 'academic', title: 'Acadêmicas' },
+          { cat: 'community', title: 'Comunidade / Tech' },
+          { cat: 'institutional', title: 'Institucionais' },
+        ].map(({ cat, title }) => {
+          const group = SOURCES.filter((s) => s.category === cat);
+          if (group.length === 0) return null;
+          return (
+            <div key={cat} style={{ marginBottom: 10 }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: 'var(--tx3)', display: 'block', marginBottom: 4,
+              }}>{title}</span>
+              <div className={styles.chips}>
+                {group.map((src) => {
+                  const isRestricted = src.status === 'restricted';
+                  const isSelected = data.sources.includes(src.label);
+                  return (
+                    <button
+                      key={src.key}
+                      className={`${styles.chip} ${isSelected ? styles.chipOn : ''}`}
+                      onClick={() => !isRestricted && toggleMulti('sources', src.label)}
+                      disabled={isRestricted}
+                      title={src.hint || ''}
+                      style={isRestricted ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                    >
+                      {src.label}
+                      {isRestricted && (
+                        <span style={{
+                          fontSize: 9, marginLeft: 4, opacity: 0.7,
+                          fontStyle: 'italic',
+                        }}>em breve</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
       <div className={styles.field}>
         <label className={styles.label}>Idiomas</label>

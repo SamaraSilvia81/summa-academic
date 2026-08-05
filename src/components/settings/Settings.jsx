@@ -5,12 +5,15 @@ import {
   PencilSimple, CaretDown, CaretUp, Eye, EyeSlash, Warning,
   User, Camera, DownloadSimple, ArrowsClockwise, Globe,
   LinkedinLogo, GraduationCap, Link as LinkIcon,
+  RssSimple, CircleNotch, Check, XCircle,
 } from '@phosphor-icons/react';
 import { signOutUser, updateProfile, selectProfile } from '../../store/slices/authSlice';
 import { useSettings } from '../../hooks/useData';
 import { saveSettings } from '../../store/slices/dataSlice';
 import { enrichAdvisor, hasGroqKey, setGroqKey } from '../../lib/ai';
 import { uploadAvatar, uploadCover } from '../../lib/storage';
+import { discoverRssFeeds } from '../../services/radarFetch';
+import { SourceRepo } from '../../services/repositories';
 
 const AREAS = [
   'Ciências Exatas e da Terra', 'Engenharias', 'Ciências da Saúde',
@@ -18,14 +21,7 @@ const AREAS = [
   'Linguística, Letras e Artes', 'Multidisciplinar',
 ];
 const PROGRAMS = ['Mestrado', 'Doutorado', 'Pós-doc', 'Graduação', 'Independente'];
-const SOURCES_LIST = [
-  // Acadêmicas
-  'Semantic Scholar', 'arXiv',
-  // Tech / comunidade
-  'Hacker News', 'Dev.to', 'Medium', 'Bluesky',
-  // Institucionais (requerem acesso)
-  'IEEE Xplore', 'ACM', 'Twitter / X', 'Google Scholar',
-];
+import { SOURCES, SOURCES_BY_LABEL, labelToKey, keyToLabel } from '../../lib/sourcesConfig';
 const LANGS_MAP = { 'Português': 'pt', 'English': 'en', 'Español': 'es', 'Français': 'fr', '日本語': 'ja' };
 const LANGS_REV = Object.fromEntries(Object.entries(LANGS_MAP).map(([k, v]) => [v, k]));
 const SYS_LANGS = [
@@ -189,6 +185,23 @@ export function Settings({ profileId }) {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [uploading, setUploading] = useState('');
 
+  // RSS custom sources
+  const [rssUrl, setRssUrl] = useState('');
+  const [rssName, setRssName] = useState('');
+  const [rssDiscovering, setRssDiscovering] = useState(false);
+  const [rssFeeds, setRssFeeds] = useState(null); // null | { feeds, isDirect }
+  const [rssError, setRssError] = useState('');
+  const [rssSaving, setRssSaving] = useState(false);
+  const [customSources, setCustomSources] = useState([]); // rows from sources table with type='rss'
+
+  // Load custom RSS sources on mount
+  useEffect(() => {
+    if (!profileId) return;
+    SourceRepo.getAll(profileId).then((rows) => {
+      setCustomSources((rows || []).filter((r) => r.type === 'rss'));
+    });
+  }, [profileId]);
+
   const avatarUrl = profile?.avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
   const coverUrl = profile?.coverUrl || null;
   const initials = (pName || '?').split(/\s+/).map(w => w[0]?.toUpperCase()).slice(0, 2).join('');
@@ -225,7 +238,7 @@ export function Settings({ profileId }) {
     setPSubarea(profile.subarea || '');
     setPProgram(profile.program || 'mestrado');
     setPKeywords(profile.keywords || []);
-    setPSources((profile.sources || []).map(s => SOURCES_LIST.find(sl => sl.toLowerCase().replace(/ \/ /g, '_').replace(/ /g, '_') === s) || s));
+    setPSources((profile.sources || []).map(s => keyToLabel(s)));
     setPLanguages((profile.languages || []).map(l => LANGS_REV[l] || l));
     setPLinkedin(profile.linkedinUrl || '');
     setPLattes(profile.lattesUrl || '');
@@ -251,7 +264,7 @@ export function Settings({ profileId }) {
         grandeArea: pArea, subarea: pSubarea, program: pProgram.toLowerCase(),
         keywords: pKeywords, areas: [pArea, pSubarea],
         languages: pLanguages.map(l => LANGS_MAP[l] || l),
-        sources: pSources.map(s => s.toLowerCase().replace(/ \/ /g, '_').replace(/ /g, '_')),
+        sources: pSources.map(s => labelToKey(s)),
         linkedinUrl: pLinkedin, lattesUrl: pLattes,
         advisorMeta: advisorInfo?.found ? advisorInfo : undefined,
       }})).unwrap();
@@ -263,6 +276,71 @@ export function Settings({ profileId }) {
   const toggle = async (field, value) => { await dispatch(saveSettings({ profileId, data: { [field]: value } })).unwrap(); };
   const handleSignOut = async () => { await dispatch(signOutUser()).unwrap(); window.location.reload(); };
   const saveGroqKeyFn = () => { setGroqKey(groqKey.trim()); setMsg('Chave Groq salva!'); setTimeout(() => setMsg(''), 3000); };
+
+  // ── RSS handlers ──────────────────────────────────────────────
+  const handleRssDiscover = async () => {
+    if (!rssUrl.trim()) return;
+    setRssDiscovering(true);
+    setRssError('');
+    setRssFeeds(null);
+    try {
+      const result = await discoverRssFeeds(rssUrl.trim());
+      if (result.feeds.length === 0) {
+        setRssError('Nenhum feed RSS/Atom encontrado nessa URL.');
+      } else {
+        setRssFeeds(result);
+        // Se achou feed direto e não tem nome, preenche com o hostname
+        if (!rssName.trim()) {
+          try { setRssName(new URL(rssUrl.trim()).hostname.replace('www.', '')); } catch {}
+        }
+      }
+    } catch (err) {
+      setRssError(err.message || 'Erro ao buscar feed.');
+    } finally {
+      setRssDiscovering(false);
+    }
+  };
+
+  const handleRssSave = async (feedUrl) => {
+    if (!feedUrl || !rssName.trim() || !profileId) return;
+    setRssSaving(true);
+    setRssError('');
+    try {
+      await SourceRepo.create({
+        profileId,
+        name: rssName.trim(),
+        type: 'rss',
+        url: feedUrl,
+        isActive: true,
+        lastFetchedAt: null,
+        fetchIntervalMinutes: 360,
+      });
+      // Refresh custom sources list
+      const rows = await SourceRepo.getAll(profileId);
+      setCustomSources((rows || []).filter((r) => r.type === 'rss'));
+      // Reset form
+      setRssUrl('');
+      setRssName('');
+      setRssFeeds(null);
+      setMsg('Fonte RSS adicionada!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setRssError(err.message || 'Erro ao salvar fonte.');
+    } finally {
+      setRssSaving(false);
+    }
+  };
+
+  const handleRssRemove = async (id) => {
+    try {
+      await SourceRepo.update(id, { isActive: false });
+      setCustomSources((prev) => prev.filter((s) => s.id !== id));
+      setMsg('Fonte removida.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Erro ao remover.');
+    }
+  };
 
   if (!settings || !profile) return null;
 
@@ -433,7 +511,202 @@ export function Settings({ profileId }) {
       {/* ═══ FONTES E IDIOMAS ═══ */}
       <Section title="fontes e idiomas" icon={Globe}>
         <label style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Fontes</label>
-        <ChipSelect options={SOURCES_LIST} selected={pSources} multi onChange={v => { setPSources(prev => prev.includes(v) ? prev.filter(s => s !== v) : [...prev, v]); markDirty(); }} />
+        {[
+          { cat: 'academic', title: 'Acadêmicas' },
+          { cat: 'community', title: 'Comunidade / Tech' },
+          { cat: 'institutional', title: 'Institucionais' },
+        ].map(({ cat, title }) => {
+          const group = SOURCES.filter((s) => s.category === cat);
+          if (group.length === 0) return null;
+          return (
+            <div key={cat} style={{ marginBottom: 8 }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+                color: 'var(--tx3)', display: 'block', marginBottom: 4,
+                letterSpacing: '0.04em',
+              }}>{title}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {group.map((src) => {
+                  const isRestricted = src.status === 'restricted';
+                  const isOn = pSources.includes(src.label);
+                  return (
+                    <button key={src.key}
+                      onClick={() => { if (!isRestricted) { setPSources(prev => prev.includes(src.label) ? prev.filter(s => s !== src.label) : [...prev, src.label]); markDirty(); } }}
+                      title={src.hint || ''}
+                      style={{
+                        padding: '5px 12px', borderRadius: 20, fontSize: 12,
+                        fontFamily: 'var(--font-mono)', cursor: isRestricted ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.15s',
+                        background: isOn ? 'var(--acc)' : 'var(--bg2)',
+                        color: isOn ? 'var(--bg0)' : 'var(--tx2)',
+                        border: `1px solid ${isOn ? 'var(--acc)' : 'var(--brd)'}`,
+                        fontWeight: isOn ? 600 : 400,
+                        opacity: isRestricted ? 0.45 : 1,
+                      }}
+                    >
+                      {src.label}
+                      {isRestricted && (
+                        <span style={{ fontSize: 9, marginLeft: 4, opacity: 0.7, fontStyle: 'italic' }}>
+                          em breve
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ── Fontes RSS customizadas ── */}
+        <div style={{
+          marginTop: 14, marginBottom: 14, padding: '14px 16px',
+          background: 'var(--bg1)', border: '1px solid var(--brd)',
+          borderRadius: 'var(--r-md)',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10,
+          }}>
+            <RssSimple size={14} style={{ color: 'var(--acc)' }} />
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              color: 'var(--tx2)', textTransform: 'uppercase', letterSpacing: '0.04em',
+            }}>Fonte customizada (RSS/Atom)</span>
+          </div>
+
+          {/* Lista de custom sources existentes */}
+          {customSources.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              {customSources.map((src) => (
+                <div key={src.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', marginBottom: 4,
+                  background: 'var(--bg2)', borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--brd)',
+                }}>
+                  <RssSimple size={12} style={{ color: 'var(--acc)', flexShrink: 0 }} />
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx)',
+                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{src.name}</span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
+                    flexShrink: 0, maxWidth: 180,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{src.url}</span>
+                  <button onClick={() => handleRssRemove(src.id)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--tx3)', padding: 2, display: 'flex',
+                  }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Formulário de adição */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <input
+              value={rssUrl}
+              onChange={(e) => { setRssUrl(e.target.value); setRssFeeds(null); setRssError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleRssDiscover())}
+              placeholder="URL do site ou feed RSS"
+              style={{
+                flex: 1, padding: '7px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx)',
+                background: 'var(--bg2)', border: '1px solid var(--brd)',
+                borderRadius: 'var(--r-sm)', outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleRssDiscover}
+              disabled={rssDiscovering || !rssUrl.trim()}
+              style={{
+                padding: '6px 14px', borderRadius: 'var(--r-sm)', border: 'none',
+                background: 'var(--acc)', color: 'var(--bg0)', cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+                opacity: rssDiscovering || !rssUrl.trim() ? 0.5 : 1,
+              }}
+            >
+              {rssDiscovering
+                ? <CircleNotch size={13} className="animate-spin" />
+                : <MagnifyingGlass size={13} />
+              }
+              {rssDiscovering ? 'buscando...' : 'detectar feed'}
+            </button>
+          </div>
+
+          {/* Erro */}
+          {rssError && (
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, color: '#F87171',
+              display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6,
+            }}>
+              <XCircle size={12} /> {rssError}
+            </div>
+          )}
+
+          {/* Feeds encontrados */}
+          {rssFeeds && rssFeeds.feeds.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
+                marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <Check size={11} style={{ color: '#4ADE80' }} />
+                {rssFeeds.feeds.length === 1
+                  ? 'Feed encontrado'
+                  : `${rssFeeds.feeds.length} feeds encontrados`
+                }
+              </div>
+
+              {/* Nome da fonte */}
+              <input
+                value={rssName}
+                onChange={(e) => setRssName(e.target.value)}
+                placeholder="Nome da fonte (ex: Blog do Prof. Silva)"
+                style={{
+                  width: '100%', padding: '7px 12px', marginBottom: 8,
+                  fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx)',
+                  background: 'var(--bg2)', border: '1px solid var(--brd)',
+                  borderRadius: 'var(--r-sm)', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+
+              {/* Lista de feeds pra escolher */}
+              {rssFeeds.feeds.map((feed, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', marginBottom: 4,
+                  background: 'var(--bg2)', borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--brd)',
+                }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
+                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{feed.title || feed.url}</span>
+                  <button
+                    onClick={() => handleRssSave(feed.url)}
+                    disabled={rssSaving || !rssName.trim()}
+                    style={{
+                      padding: '3px 10px', borderRadius: 14, border: 'none',
+                      background: '#4ADE80', color: '#000', cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                      opacity: rssSaving || !rssName.trim() ? 0.5 : 1,
+                      display: 'flex', alignItems: 'center', gap: 3,
+                    }}
+                  >
+                    <Plus size={11} weight="bold" />
+                    adicionar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <label style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Idiomas dos papers</label>
         <ChipSelect options={Object.keys(LANGS_MAP)} selected={pLanguages} multi onChange={v => { setPLanguages(prev => prev.includes(v) ? prev.filter(l => l !== v) : [...prev, v]); markDirty(); }} />
 
