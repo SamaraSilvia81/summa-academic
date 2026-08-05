@@ -13,10 +13,11 @@ const ALLOWED_HOSTS = [
   'export.arxiv.org',
   'api.semanticscholar.org',
   // Comunidades / notícias tech
-  'hn.algolia.com',          // Hacker News (via Algolia)
-  'dev.to',                  // Dev.to
-  'medium.com',              // Medium (feed RSS por tag)
-  'rss.medium.com',          // Medium RSS alternativo
+  'hn.algolia.com',              // Hacker News (via Algolia)
+  'dev.to',                      // Dev.to
+  'medium.com',                  // Medium (feed RSS por tag)
+  'rss.medium.com',              // Medium RSS alternativo
+  'public.api.bsky.app',         // Bluesky (API pública, sem auth)
 ];
 
 const corsHeaders = {

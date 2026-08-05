@@ -36,6 +36,10 @@ export function Sidebar({ profileName, institution, profileId }) {
   const profile = useSelector(selectProfile);
   const isDark = !settings || settings.theme !== 'light';
 
+  // Badge de novidades do Farol
+  const radarItems = useSelector(state => state.data.radar.items);
+  const unreadCount = radarItems ? radarItems.filter(i => !i.isRead && !i.isDismissed).length : 0;
+
   const avatarUrl = getAvatarUrl(user, profile);
 
   async function toggleTheme() {
@@ -63,9 +67,26 @@ export function Sidebar({ profileName, institution, profileId }) {
       <nav className={styles.nav}>
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname.startsWith(to);
+          const isFarol = to === '/farol';
+          const badge = isFarol && unreadCount > 0 ? unreadCount : null;
           return (
             <NavLink key={to} to={to} className={`${styles.ni} ${isActive ? styles.active : ''}`} title={label}>
-              <span className={styles.niIcon}><Icon size={20} weight={isActive ? 'fill' : 'regular'} /></span>
+              <span className={styles.niIcon} style={{ position: 'relative' }}>
+                <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+                {badge && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -5,
+                    minWidth: 14, height: 14, borderRadius: 7,
+                    background: 'var(--acc)', color: 'var(--bg0)',
+                    fontSize: 9, fontWeight: 800, fontFamily: 'var(--font-mono)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 3px', lineHeight: 1,
+                    boxShadow: '0 0 6px var(--acc-glow)',
+                  }}>
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </span>
               <span className={styles.niLabel}>{label}</span>
             </NavLink>
           );

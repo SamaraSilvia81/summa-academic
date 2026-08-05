@@ -19,8 +19,11 @@ const AREAS = [
 ];
 const PROGRAMS = ['Mestrado', 'Doutorado', 'Pós-doc', 'Graduação', 'Independente'];
 const SOURCES_LIST = [
+  // Acadêmicas
   'Semantic Scholar', 'arXiv',
-  'Hacker News', 'Dev.to', 'Medium',
+  // Tech / comunidade
+  'Hacker News', 'Dev.to', 'Medium', 'Bluesky',
+  // Institucionais (requerem acesso)
   'IEEE Xplore', 'ACM', 'Twitter / X', 'Google Scholar',
 ];
 const LANGS_MAP = { 'Português': 'pt', 'English': 'en', 'Español': 'es', 'Français': 'fr', '日本語': 'ja' };

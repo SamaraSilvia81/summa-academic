@@ -48,6 +48,7 @@ export function normalizeSourceKey(raw) {
   if (n.includes('acm')) return 'acm';
   if (n.includes('twitter') || n === 'x' || n.includes('/ x')) return 'twitter';
   if (n.includes('google scholar')) return 'google_scholar';
+  if (n.includes('bluesky') || n.includes('bsky')) return 'bluesky';
   if (n.includes('medium')) return 'medium';
   if (n.includes('dev to') || n === 'devto') return 'devto';
   if (n.includes('hacker news') || n.includes('hackernews')) return 'hackernews';
@@ -61,6 +62,7 @@ const SOURCE_LABELS = {
   acm: 'ACM Digital Library',
   twitter: 'Twitter / X',
   google_scholar: 'Google Scholar',
+  bluesky:          'Bluesky',
   medium: 'Medium',
   devto: 'Dev.to',
   hackernews: 'Hacker News',
@@ -224,12 +226,50 @@ async function fetchMedium(profile) {
   });
 }
 
+async function fetchBluesky(profile) {
+  const terms = buildTerms(profile);
+  if (terms.length === 0) return [];
+
+  // Bluesky tem API pública de busca (AppView) sem autenticação
+  // Busca por cada termo separadamente e une os resultados
+  const results = [];
+  for (const term of terms.slice(0, 3)) {
+    const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=10&sort=latest`;
+    try {
+      const raw = await fetchViaProxy(url);
+      const data = JSON.parse(raw);
+      for (const post of data.posts || []) {
+        const text = post.record?.text || '';
+        const author = post.author?.displayName || post.author?.handle || null;
+        const uri = post.uri || null;
+        // Converte at:// URI em link web
+        const webUrl = uri
+          ? `https://bsky.app/profile/${post.author?.handle}/post/${uri.split('/').pop()}`
+          : null;
+        results.push({
+          title: text.slice(0, 120) + (text.length > 120 ? '…' : ''),
+          type: 'thread',
+          sourceUrl: webUrl,
+          authors: author,
+          summary: text,
+          language: 'en',
+          publishedAt: post.indexedAt ? new Date(post.indexedAt) : null,
+        });
+      }
+    } catch {
+      // ignora erro de um termo específico
+    }
+  }
+  return results;
+}
+
 const SOURCE_FETCHERS = {
   arxiv: fetchArxiv,
   semantic_scholar: fetchSemanticScholar,
   hackernews: fetchHackerNews,
   devto: fetchDevTo,
   medium: fetchMedium,
+  bluesky: fetchBluesky,
 };
 
 // ── Relevância (fallback sem IA) ─────────────────────────────────
