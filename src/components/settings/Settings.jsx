@@ -18,7 +18,11 @@ const AREAS = [
   'Linguística, Letras e Artes', 'Multidisciplinar',
 ];
 const PROGRAMS = ['Mestrado', 'Doutorado', 'Pós-doc', 'Graduação', 'Independente'];
-const SOURCES_LIST = ['Semantic Scholar', 'arXiv', 'IEEE Xplore', 'ACM', 'Twitter / X', 'Google Scholar'];
+const SOURCES_LIST = [
+  'Semantic Scholar', 'arXiv',
+  'Hacker News', 'Dev.to', 'Medium',
+  'IEEE Xplore', 'ACM', 'Twitter / X', 'Google Scholar',
+];
 const LANGS_MAP = { 'Português': 'pt', 'English': 'en', 'Español': 'es', 'Français': 'fr', '日本語': 'ja' };
 const LANGS_REV = Object.fromEntries(Object.entries(LANGS_MAP).map(([k, v]) => [v, k]));
 const SYS_LANGS = [

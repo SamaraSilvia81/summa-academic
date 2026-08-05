@@ -7,9 +7,11 @@ import {
   RadarRepo,
   ReferenceRepo,
   SettingsRepo,
+  SourceRepo,
   TaskRepo,
 } from '../../services/repositories';
 import { uploadReferenceFile, deleteReferenceFile } from '../../lib/storage';
+import { runRadarFetch } from '../../services/radarFetch';
 
 const ALL = '__all__';
 const ROOT = '__root__';
@@ -64,6 +66,52 @@ export const markRadarItemRead = createAsyncThunk('data/markRadarItemRead', asyn
   await dispatch(loadRadarStats(profileId));
   return id;
 });
+
+export const fetchRadarUpdates = createAsyncThunk(
+  'data/fetchRadarUpdates',
+  async ({ profileId, profile, force = false }, { dispatch }) => {
+    const [sourceRows, existingItems] = await Promise.all([
+      SourceRepo.getAll(profileId),
+      RadarRepo.getAll(profileId),
+    ]);
+
+    const { newItems, sourceUpdates, errors, skipped } = await runRadarFetch({
+      profile,
+      sourceRows: sourceRows ?? [],
+      existingItems: existingItems ?? [],
+      force,
+    });
+
+    for (const item of newItems) {
+      await RadarRepo.create(item);
+    }
+
+    for (const update of sourceUpdates) {
+      if (update.existingRowId) {
+        await SourceRepo.update(update.existingRowId, { lastFetchedAt: update.lastFetchedAt });
+      } else {
+        // fonte marcada no perfil mas sem linha em `sources` ainda — cria agora
+        await SourceRepo.create({
+          profileId,
+          name: update.name,
+          type: 'api',
+          url: null,
+          isActive: true,
+          lastFetchedAt: update.lastFetchedAt,
+          fetchIntervalMinutes: 1440,
+        });
+      }
+    }
+
+    await Promise.all([
+      dispatch(loadRadarItems(profileId)),
+      dispatch(loadRadarStats(profileId)),
+      dispatch(loadRadarCfps(profileId)),
+    ]);
+
+    return { count: newItems.length, errors, skipped };
+  }
+);
 
 export const loadNotes = createAsyncThunk('data/loadNotes', async ({ profileId, type = null }) => {
   if (!profileId) return { key: type ?? ALL, notes: [] };
@@ -228,6 +276,7 @@ const initialState = {
     items: [],
     stats: null,
     cfps: [],
+    lastFetch: null, // { count, errors, skipped, at }
   },
   notes: {
     byKey: {},
@@ -286,6 +335,12 @@ const dataSlice = createSlice({
         state.radar.cfps = action.payload;
         state.status.radarCfps = 'ready';
       })
+      .addCase(fetchRadarUpdates.pending, (state) => pending(state, 'radarFetch'))
+      .addCase(fetchRadarUpdates.fulfilled, (state, action) => {
+        state.status.radarFetch = 'ready';
+        state.radar.lastFetch = { ...action.payload, at: Date.now() };
+      })
+      .addCase(fetchRadarUpdates.rejected, (state, action) => failed(state, 'radarFetch', action))
       .addCase(loadNotes.fulfilled, (state, action) => {
         state.notes.byKey[action.payload.key] = action.payload.notes;
       })

@@ -1,11 +1,8 @@
-﻿import { useDispatch } from 'react-redux';
-import { BookmarkSimple, X } from '@phosphor-icons/react';
-import { useRadarItems, useRadarStats, useNotes, useRadarCfps } from '../../hooks/useData';
+﻿import { useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import { ArrowsClockwise, BookmarkSimple, X, ArrowSquareOut } from '@phosphor-icons/react';
+import { useRadarItems, useRadarStats, useNotes, useRadarCfps, useRadarFetch } from '../../hooks/useData';
 import { dismissRadarItem, markRadarItemRead, toggleRadarSave } from '../../store/slices/dataSlice';
-
-
-
-
 
 
 export function Farol({ profileId }) {
@@ -15,6 +12,20 @@ export function Farol({ profileId }) {
   const cfps = useRadarCfps(profileId);
 
   const papers = items?.filter((i) => i.type === 'paper' || i.type === 'post' || i.type === 'thread') || [];
+
+  const { run: runRadarFetch, status: fetchStatus, lastFetch } = useRadarFetch(profileId);
+  const isFetching = fetchStatus === 'loading';
+
+  // Busca automática ao abrir o Farol — sem forçar (respeita o
+  // fetchIntervalMinutes de cada fonte, então não bate nas APIs de novo
+  // se já buscou recentemente). Guard com ref pra não disparar 2x em
+  // StrictMode / re-render.
+  const autoFetchedFor = useRef(null);
+  useEffect(() => {
+    if (!profileId || autoFetchedFor.current === profileId) return;
+    autoFetchedFor.current = profileId;
+    runRadarFetch(false);
+  }, [profileId, runRadarFetch]);
 
   return (
     <div className="animate-fade-in">
@@ -86,11 +97,31 @@ export function Farol({ profileId }) {
         marginBottom: 14, borderLeft: '3px solid var(--acc)'
       }}>
         <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 13,
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-          color: 'var(--acc)', marginBottom: 6
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 6
         }}>
-          {'>'} informe semanal
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 13,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            color: 'var(--acc)'
+          }}>
+            {'>'} informe semanal
+          </div>
+          <button
+            onClick={() => runRadarFetch(true)}
+            disabled={isFetching}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: 'none', border: '1px dashed var(--brd)',
+              borderRadius: 'var(--r-md)', padding: '3px 8px',
+              color: 'var(--tx3)', cursor: isFetching ? 'default' : 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 12,
+              opacity: isFetching ? 0.6 : 1
+            }}
+          >
+            <ArrowsClockwise size={12} className={isFetching ? 'animate-spin' : ''} />
+            {isFetching ? 'buscando...' : 'buscar agora'}
+          </button>
         </div>
         <div style={{
           fontFamily: 'var(--font-display)', fontWeight: 600,
@@ -98,9 +129,17 @@ export function Farol({ profileId }) {
         }}>
           Resumo das suas áreas de pesquisa
         </div>
-        <div style={{ fontSize: 15, color: 'var(--tx2)', lineHeight: 1.5, marginBottom: 10 }}>
+        <div style={{ fontSize: 15, color: 'var(--tx2)', lineHeight: 1.5, marginBottom: lastFetch ? 6 : 10 }}>
           {stats ? `${stats.total} itens monitorados, ${stats.unread} não lidos esta semana.` : 'Carregando...'}
         </div>
+        {lastFetch &&
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)' }}>
+            {lastFetch.count > 0 ?
+          `+${lastFetch.count} ${lastFetch.count === 1 ? 'item novo' : 'itens novos'} na última busca` :
+          'nenhum item novo na última busca'}
+            {lastFetch.errors?.length > 0 && ` · ${lastFetch.errors.length} fonte(s) falharam`}
+          </div>
+        }
       </div>
 
       {/* Papers */}
@@ -205,13 +244,14 @@ function RadarCard({ item, profileId }) {
 
   const handleRead = async () => {
     if (item.id && !item.isRead) await dispatch(markRadarItemRead({ profileId, id: item.id })).unwrap();
+    if (item.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div onClick={handleRead} style={{
       background: 'var(--bg2)', borderRadius: 'var(--r-md)',
       padding: '12px 14px', border: '1px solid var(--brd)',
-      cursor: 'pointer', transition: 'all 0.2s',
+      cursor: item.sourceUrl ? 'pointer' : 'default', transition: 'all 0.2s',
       position: 'relative', opacity: item.isRead ? 0.7 : 1
     }}>
       <div style={{
@@ -235,14 +275,19 @@ function RadarCard({ item, profileId }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
-          padding: '2px 7px', borderRadius: 3,
-          background: 'var(--acc-bg)', color: 'var(--acc)',
-          border: '1px dashed rgba(212,160,48,0.15)'
-        }}>
-          {item.relevanceScore}%
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600,
+            padding: '2px 7px', borderRadius: 3,
+            background: 'var(--acc-bg)', color: 'var(--acc)',
+            border: '1px dashed rgba(212,160,48,0.15)'
+          }}>
+            {item.relevanceScore}%
+          </span>
+          {item.sourceUrl && (
+            <ArrowSquareOut size={13} style={{ color: 'var(--tx3)', opacity: 0.5 }} />
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button onClick={handleSave} style={{
             background: 'none', border: 'none', cursor: 'pointer',

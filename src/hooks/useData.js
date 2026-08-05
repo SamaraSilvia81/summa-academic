@@ -10,6 +10,7 @@ import {
   loadDocumentsByFolder,
   loadFolders,
   loadNotes,
+  fetchRadarUpdates,
   loadRadarCfps,
   loadRadarItems,
   loadRadarStats,
@@ -62,6 +63,26 @@ export function useRadarCfps(profileId) {
   }, [dispatch, profileId]);
 
   return useSelector((state) => state.data.radar.cfps);
+}
+
+/** Dispara a busca automática de itens novos (arXiv, Semantic Scholar, ...)
+ *  a partir das fontes ativas no perfil. Use `run(true)` pra forçar mesmo
+ *  fora do intervalo configurado (ex: botão "buscar agora"). */
+export function useRadarFetch(profileId) {
+  const dispatch = useDispatch();
+  const profile = useProfile();
+  const status = useSelector((state) => state.data.status.radarFetch);
+  const lastFetch = useSelector((state) => state.data.radar.lastFetch);
+
+  const run = useCallback(
+    (force = false) => {
+      if (!profileId || !profile) return Promise.resolve(null);
+      return dispatch(fetchRadarUpdates({ profileId, profile, force })).unwrap();
+    },
+    [dispatch, profileId, profile]
+  );
+
+  return { run, status, lastFetch };
 }
 
 export function useNotes(profileId, type) {
