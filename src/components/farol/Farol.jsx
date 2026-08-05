@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import {
   ArrowsClockwise, BookmarkSimple,
   Funnel, ChartBar, Newspaper, Lightning,
-  CalendarBlank, List
+  CalendarBlank, List, CaretLeft, CaretRight
 } from '@phosphor-icons/react';
 import { useRadarItems, useRadarStats, useNotes, useRadarCfps, useRadarFetch } from '../../hooks/useData';
 import { dismissRadarItem, markRadarItemRead, toggleRadarSave } from '../../store/slices/dataSlice';
@@ -56,6 +56,17 @@ function getItemImage(item, type) {
   }
 
   return url;
+}
+
+/** Decodifica HTML entities (&#x2019; → ', &#x2014; → — etc.) */
+function decodeEntities(text) {
+  if (!text) return '';
+  try {
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    return doc.documentElement.textContent || text;
+  } catch {
+    return text;
+  }
 }
 
 export function Farol({ profileId }) {
@@ -132,8 +143,24 @@ export function Farol({ profileId }) {
     { key: 'saved', label: 'Favoritos', count: saved.length },
   ].filter(c => c.key === 'all' || c.count > 0), [allItems, typeCounts, saved]);
 
+  // ── Top items pro ticker (maior relevância ou mais recentes) ──
+  const tickerItems = useMemo(() => {
+    return [...allItems]
+      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+      .slice(0, 8)
+      .map(i => ({
+        id: i.id,
+        title: i.title,
+        type: i.type,
+        source: i.source,
+        sourceUrl: i.sourceUrl,
+        score: i.relevanceScore,
+      }));
+  }, [allItems]);
+
   return (
     <div className="animate-fade-in" style={{ background: 'transparent', padding: '0 24px 24px 24px', color: 'var(--tx)' }}>
+      {tickerItems.length > 0 && <NewsTicker items={tickerItems} />}
       <FarolHeader />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, marginTop: 16 }}>
@@ -205,6 +232,90 @@ export function Farol({ profileId }) {
       ) : (
         <DashboardView allItems={allItems} />
       )}
+    </div>
+  );
+}
+
+// ── News Ticker (fita de notícias) ────────────────────────────────
+function NewsTicker({ items }) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    if (isPaused) return;
+    intervalRef.current = setInterval(() => {
+      setCurrentIdx(i => (i + 1) % items.length);
+    }, 5000);
+    return () => clearInterval(intervalRef.current);
+  }, [items.length, isPaused]);
+
+  if (!items || items.length === 0) return null;
+
+  const current = items[currentIdx];
+  const typeMeta = TYPE_META[current.type] || { label: 'Info', color: 'var(--acc)' };
+
+  const handleClick = () => {
+    if (current.sourceUrl) window.open(current.sourceUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      style={{
+        display: 'flex', alignItems: 'center',
+        background: 'var(--bg3)',
+        padding: '7px 20px',
+        overflow: 'hidden',
+        width: '100%',
+        marginRight: -24,
+      }}
+    >
+      {/* Badge */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: '#e74c3c', color: '#fff',
+        padding: '3px 10px', borderRadius: 3,
+        fontWeight: 700, fontFamily: 'var(--font-mono)',
+        fontSize: 10, textTransform: 'uppercase',
+        letterSpacing: '0.04em', flexShrink: 0,
+      }}>
+        Destaque
+      </div>
+
+      {/* Título */}
+      <div
+        onClick={handleClick}
+        style={{
+          flex: 1, padding: '0 16px',
+          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+          cursor: current.sourceUrl ? 'pointer' : 'default',
+          fontFamily: 'var(--font-body)', fontSize: 13,
+          color: 'var(--tx)', fontWeight: 400,
+        }}
+      >
+        {decodeEntities(current.title)}
+      </div>
+
+      {/* Nav arrows */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setCurrentIdx(i => (i - 1 + items.length) % items.length); }}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--tx3)', padding: 2, display: 'flex',
+          }}
+        ><CaretLeft size={14} weight="bold" /></button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setCurrentIdx(i => (i + 1) % items.length); }}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--tx3)', padding: 2, display: 'flex',
+          }}
+        ><CaretRight size={14} weight="bold" /></button>
+      </div>
     </div>
   );
 }
@@ -323,7 +434,7 @@ function FeedView({ items, notes, saved, profileId }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {saved && saved.slice(0, 4).map(item => (
               <div key={item.id} onClick={() => { if(item.sourceUrl) window.open(item.sourceUrl, '_blank'); }} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--brd)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{item.title}</span>
+                <span style={{ fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{decodeEntities(item.title)}</span>
                 <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>{timeAgo(item.publishedAt)}</span>
               </div>
             ))}
@@ -406,8 +517,8 @@ function CardRenderer({ item, isLarge, isVertical, dispatch, profileId }) {
             <BookmarkSimple size={16} weight={item.isSaved ? 'fill' : 'regular'} />
           </div>
         </div>
-        <h3 style={{ fontFamily: 'var(--font-quote)', fontSize: titleSize, fontWeight: 700, color: 'var(--tx)', margin: '8px 0 0', lineHeight: 1.2 }}>{item.title}</h3>
-        {!isVertical && <p style={{ fontSize: 13, color: 'var(--tx3)', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.summary}</p>}
+        <h3 style={{ fontFamily: 'var(--font-quote)', fontSize: titleSize, fontWeight: 700, color: 'var(--tx)', margin: '8px 0 0', lineHeight: 1.2 }}>{decodeEntities(item.title)}</h3>
+        {!isVertical && <p style={{ fontSize: 13, color: 'var(--tx3)', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{decodeEntities(item.summary)}</p>}
       </div>
     </div>
   );

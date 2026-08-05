@@ -127,7 +127,8 @@ async function fetchArxiv(keyword, start = 0, maxResults = 100) {
 
 // ── Semantic Scholar API ────────────────────────────────────────
 
-async function fetchSemanticScholar(keyword, offset = 0, limit = 100) {
+async function fetchSemanticScholar(keyword, offset = 0, limit = 100, _retries = 0) {
+  const MAX_RETRIES = 3;
   const fields = 'title,authors,abstract,year,externalIds,venue,url,publicationDate';
   const q = encodeURIComponent(keyword);
   const apiUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${q}&offset=${offset}&limit=${limit}&fields=${fields}`;
@@ -138,9 +139,13 @@ async function fetchSemanticScholar(keyword, offset = 0, limit = 100) {
   });
 
   if (res.status === 429) {
-    console.log('  [s2] rate limited, esperando 30s...');
+    if (_retries >= MAX_RETRIES) {
+      console.log(`  [s2] rate limited ${MAX_RETRIES}x, pulando "${keyword}" offset=${offset}`);
+      return [];
+    }
+    console.log(`  [s2] rate limited, esperando 30s... (tentativa ${_retries + 1}/${MAX_RETRIES})`);
     await sleep(30000);
-    return fetchSemanticScholar(keyword, offset, limit);
+    return fetchSemanticScholar(keyword, offset, limit, _retries + 1);
   }
   if (!res.ok) throw new Error(`Semantic Scholar retornou ${res.status}`);
 
@@ -199,51 +204,37 @@ async function insertReferences(profileId, items) {
   let skipped = 0;
 
   for (let i = 0; i < items.length; i += BATCH) {
-    const batch = items.slice(i, i + BATCH).map((item) => toSnake({
-      profileId,
+    const batch = items.slice(i, i + BATCH).map((item) => ({
+      profile_id: profileId,
       title: item.title,
-      authors: item.authors,
+      authors: item.authors || null,
       venue: item.venue || null,
       year: item.year,
       doi: item.doi || null,
       url: item.url || null,
       type: 'paper_read',
       tags: ['backfill', item.source],
-      personalNote: null,
+      personal_note: null,
       rating: null,
-      isRead: false,
-      isFavorite: false,
-      createdAt: new Date(),
+      is_read: false,
+      is_favorite: false,
+      created_at: new Date().toISOString(),
     }));
 
     const { data, error } = await supabase
       .from('references')
-      .upsert(batch, { onConflict: 'profile_id,doi', ignoreDuplicates: true })
+      .insert(batch)
       .select('id');
 
     if (error) {
-      // Se o upsert com doi falha (items sem DOI), tenta insert normal
-      if (error.message?.includes('upsert') || error.message?.includes('constraint')) {
-        const { data: d2, error: e2 } = await supabase
-          .from('references')
-          .insert(batch)
-          .select('id');
-        if (e2) {
-          console.error(`  [erro] batch ${i}-${i + BATCH}: ${e2.message}`);
-          skipped += batch.length;
-        } else {
-          inserted += (d2 || []).length;
-        }
-      } else {
-        console.error(`  [erro] batch ${i}-${i + BATCH}: ${error.message}`);
-        skipped += batch.length;
-      }
+      console.error(`  [erro] batch ${i}-${i + BATCH}: ${error.message}`);
+      skipped += batch.length;
     } else {
       inserted += (data || []).length;
     }
 
     process.stdout.write(`\r  [inserindo] ${inserted} inseridos, ${skipped} pulados de ${items.length}...`);
-    await sleep(200); // rate limit suave
+    await sleep(200);
   }
   console.log('');
   return { inserted, skipped };
@@ -346,94 +337,90 @@ async function main() {
   console.log(`[config] target: ${TARGET}`);
   console.log(`[config] dry_run: ${DRY_RUN}\n`);
 
-  // ── Coleta ──────────────────────────────────────────────────
-  let allPapers = [];
+  const seenTitles = new Set();
+  let totalInserted = 0;
 
-  // ArXiv: busca paginada por keyword
+  // ── Helper: deduplica + insere um lote ──────────────────────
+  async function flushBatch(papers, sourceLabel) {
+    // Deduplica internamente
+    const unique = papers.filter((p) => {
+      const key = p.doi ? `doi:${p.doi.toLowerCase()}` : `t:${normalizeTitle(p.title)}`;
+      if (seenTitles.has(key)) return false;
+      seenTitles.add(key);
+      return true;
+    });
+
+    if (unique.length === 0) {
+      console.log(`  [${sourceLabel}] 0 papers novos (todos duplicados)\n`);
+      return;
+    }
+
+    console.log(`  [${sourceLabel}] ${unique.length} papers únicos, inserindo...`);
+
+    if (DRY_RUN) {
+      console.log(`  [dry_run] pulando inserção de ${unique.length} papers\n`);
+      return;
+    }
+
+    if (TARGET === 'references' || TARGET === 'both') {
+      const result = await insertReferences(PROFILE_ID, unique);
+      totalInserted += result.inserted;
+      console.log(`  [${sourceLabel}] Acervo: +${result.inserted} (total acumulado: ${totalInserted})\n`);
+    }
+    if (TARGET === 'radar' || TARGET === 'both') {
+      const result = await insertRadarItems(PROFILE_ID, unique);
+      console.log(`  [${sourceLabel}] Farol: +${result.inserted}\n`);
+    }
+  }
+
+  // ── ArXiv: busca paginada por keyword, insere após cada keyword ──
+  console.log('══ FASE 1: ArXiv ══\n');
   for (const keyword of KEYWORDS) {
+    const batch = [];
     try {
       let start = 0;
       const perPage = 100;
       let hasMore = true;
 
-      while (hasMore && allPapers.length < MAX_RESULTS) {
-        const batch = await fetchArxiv(keyword, start, perPage);
-        allPapers.push(...batch);
-        console.log(`    -> ${batch.length} resultados (total parcial: ${allPapers.length})`);
+      while (hasMore && batch.length < MAX_RESULTS) {
+        const results = await fetchArxiv(keyword, start, perPage);
+        batch.push(...results);
+        console.log(`    -> ${results.length} resultados (parcial: ${batch.length})`);
 
-        if (batch.length < perPage) hasMore = false;
+        if (results.length < perPage) hasMore = false;
         start += perPage;
-
-        // ArXiv pede 3s entre requests
         await sleep(3000);
       }
     } catch (err) {
       console.error(`  [arxiv] erro com "${keyword}": ${err.message}`);
     }
+
+    if (batch.length > 0) {
+      await flushBatch(batch, `arxiv:"${keyword}"`);
+    }
   }
 
-  // Semantic Scholar: busca por keyword
+  // ── Semantic Scholar: 1 página por keyword (evita rate limit) ──
+  console.log('══ FASE 2: Semantic Scholar ══\n');
+  console.log('  (buscando apenas 1 página por keyword pra evitar rate limit)\n');
   for (const keyword of KEYWORDS) {
     try {
-      let offset = 0;
-      const limit = 100;
-      let hasMore = true;
-
-      while (hasMore && allPapers.length < MAX_RESULTS * 2) {
-        const batch = await fetchSemanticScholar(keyword, offset, limit);
-        allPapers.push(...batch);
-        console.log(`    -> ${batch.length} resultados (total parcial: ${allPapers.length})`);
-
-        if (batch.length < limit) hasMore = false;
-        offset += limit;
-
-        // S2 rate limit: 1 req/s
-        await sleep(1500);
+      const results = await fetchSemanticScholar(keyword, 0, 100);
+      console.log(`    -> ${results.length} resultados`);
+      if (results.length > 0) {
+        await flushBatch(results, `s2:"${keyword}"`);
       }
+      // Espera mais entre keywords pra não levar rate limit
+      await sleep(5000);
     } catch (err) {
       console.error(`  [s2] erro com "${keyword}": ${err.message}`);
     }
   }
 
-  // ── Deduplica ─────────────────────────────────────────────────
-  console.log(`\n[dedupe] ${allPapers.length} papers brutos...`);
-  const unique = deduplicate(allPapers);
-  console.log(`[dedupe] ${unique.length} papers únicos após deduplicação.\n`);
-
-  // Limita ao MAX_RESULTS
-  const final = unique.slice(0, MAX_RESULTS);
-
-  // ── Preview ───────────────────────────────────────────────────
-  console.log('[preview] primeiros 5 items:');
-  final.slice(0, 5).forEach((p, i) => {
-    console.log(`  ${i + 1}. [${p.year || '?'}] ${p.title.slice(0, 80)}...`);
-    console.log(`     ${p.source} | ${p.authors.split(',').slice(0, 2).join(', ')}`);
-  });
-  console.log('');
-
-  if (DRY_RUN) {
-    console.log('[dry_run] nenhum dado inserido. Remova DRY_RUN=true pra executar.\n');
-    // Salva JSON pra inspeção
-    const fs = await import('fs');
-    fs.writeFileSync('backfill-preview.json', JSON.stringify(final.slice(0, 20), null, 2));
-    console.log('[dry_run] salvou backfill-preview.json com 20 items de amostra.\n');
-    return;
-  }
-
-  // ── Inserção ──────────────────────────────────────────────────
-  if (TARGET === 'references' || TARGET === 'both') {
-    console.log(`[insert] inserindo ${final.length} papers na tabela references (Acervo)...`);
-    const result = await insertReferences(PROFILE_ID, final);
-    console.log(`[insert] Acervo: ${result.inserted} inseridos, ${result.skipped} pulados.\n`);
-  }
-
-  if (TARGET === 'radar' || TARGET === 'both') {
-    console.log(`[insert] inserindo ${final.length} papers na tabela radar_items (Farol)...`);
-    const result = await insertRadarItems(PROFILE_ID, final);
-    console.log(`[insert] Farol: ${result.inserted} inseridos, ${result.skipped} pulados.\n`);
-  }
-
-  console.log('[done] backfill completo!\n');
+  // ── Resumo final ────────────────────────────────────────────
+  console.log(`\n[done] Backfill completo!`);
+  console.log(`[done] Total inserido: ${totalInserted} papers`);
+  console.log(`[done] Total únicos processados: ${seenTitles.size}\n`);
 }
 
 main().catch((err) => {
