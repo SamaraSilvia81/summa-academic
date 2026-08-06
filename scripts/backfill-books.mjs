@@ -17,6 +17,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
 const PROFILE_ID = process.env.PROFILE_ID || null;
 const DRY_RUN = process.env.DRY_RUN === 'true';
+const ALLOWED_LANGUAGES = (process.env.LANGUAGES || 'en,pt').split(',').map(l => l.trim().toLowerCase());
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

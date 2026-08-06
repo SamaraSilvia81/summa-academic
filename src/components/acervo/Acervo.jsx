@@ -25,7 +25,7 @@ import { copyCitation, exportBibTeX, exportRIS } from '../../lib/citations';
 import { ReferenceFolderRepo } from '../../services/repositories';
 import { PdfThumbnail } from './PdfThumbnail';
 
-const FILTERS = ['todos', 'papers', 'meus artigos', 'datasets', 'notas', 'favoritos'];
+const FILTERS = ['todos', 'papers', 'livros', 'artigos', 'meus artigos', 'datasets', 'notas', 'favoritos'];
 
 const SORT_OPTIONS = [
   { value: 'recent', label: 'recentes' },
@@ -210,6 +210,8 @@ export function Acervo({ profileId }) {
     }
   }).filter((ref) => {
     if (activeFilter === 'papers') return ref.type === 'paper_read';
+    if (activeFilter === 'livros') return ref.type === 'book';
+    if (activeFilter === 'artigos') return ref.type === 'post' || ref.type === 'thread' || ref.type === 'news';
     if (activeFilter === 'meus artigos') return ref.type === 'my_article';
     if (activeFilter === 'datasets') return ref.type === 'dataset';
     if (activeFilter === 'notas') return ref.type === 'note';
@@ -883,6 +885,20 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
   const typeLabels = {
     paper_read: 'paper', my_article: 'meu art.',
     dataset: 'dataset', book: 'livro', thesis: 'tese', note: 'nota',
+    post: 'artigo', thread: 'thread', news: 'notícia', cfp: 'CFP',
+  };
+
+  const TYPE_COLORS = {
+    paper_read: '#D4A030',
+    my_article: 'var(--acc)',
+    dataset: 'var(--green)',
+    book: '#F472B6',
+    thesis: '#60A5FA',
+    note: '#8A8680',
+    post: '#7B9EE0',
+    thread: '#A07BD4',
+    news: '#F87171',
+    cfp: '#4ADE80',
   };
 
   const toggleFavorite = async () => {
@@ -1063,10 +1079,7 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
   );
 
   // ── GRID (biblioteca digital — vertical) ────────────────────────
-  const typeColor = reference.type === 'my_article' ? 'var(--acc)'
-    : reference.type === 'dataset' ? 'var(--green)'
-    : reference.type === 'book' ? '#F472B6'
-    : reference.type === 'thesis' ? '#60A5FA' : '#8A8680';
+  const typeColor = TYPE_COLORS[reference.type] || '#8A8680';
 
   return (
     <div

@@ -34,7 +34,10 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || null;
 const PROFILE_ID   = process.env.PROFILE_ID || null;
 const MAX_RESULTS  = parseInt(process.env.MAX_RESULTS || '500', 10);
 const DRY_RUN      = process.env.DRY_RUN === 'true';
-const TARGET       = process.env.TARGET || 'references'; // 'references' | 'radar' | 'both'
+const TARGET       = process.env.TARGET || 'references';
+
+// Idiomas aceitos (alinhado com profile.languages)
+const ALLOWED_LANGUAGES = (process.env.LANGUAGES || 'en,pt').split(',').map(l => l.trim().toLowerCase());
 
 // ── Keywords organizadas por eixo de pesquisa ────────────────────
 const KEYWORD_GROUPS = {
@@ -267,6 +270,13 @@ function deduplicate(items) {
   });
 }
 
+/** Verifica se o idioma do item é aceito pelo perfil. */
+function passesLanguageFilter(item) {
+  if (!item.language) return true;
+  const lang = item.language.toLowerCase().slice(0, 2);
+  return ALLOWED_LANGUAGES.some(a => a.startsWith(lang) || lang.startsWith(a));
+}
+
 // ── Insert no Supabase ──────────────────────────────────────────
 
 function toSnake(obj) {
@@ -428,8 +438,9 @@ async function main() {
 
   // ── Helper: deduplica + insere um lote ──────────────────────
   async function flushBatch(papers, sourceLabel) {
-    // Deduplica internamente
+    // Deduplica + filtra por idioma
     const unique = papers.filter((p) => {
+      if (!passesLanguageFilter(p)) return false;
       const key = p.doi ? `doi:${p.doi.toLowerCase()}` : `t:${normalizeTitle(p.title)}`;
       if (seenTitles.has(key)) return false;
       seenTitles.add(key);
