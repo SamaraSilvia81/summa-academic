@@ -36,17 +36,54 @@ const MAX_RESULTS  = parseInt(process.env.MAX_RESULTS || '500', 10);
 const DRY_RUN      = process.env.DRY_RUN === 'true';
 const TARGET       = process.env.TARGET || 'references'; // 'references' | 'radar' | 'both'
 
-// Todas as variações de keywords pra busca
-const KEYWORDS = [
-  'microfrontend',
-  'micro frontend',
-  'micro-frontend',
-  'microfrontends',
-  'micro frontends',
-  'micro-frontends',
-  'self-admitted technical debt',
-  'SATD',
-  'technical debt microfrontend',
+// ── Keywords organizadas por eixo de pesquisa ────────────────────
+const KEYWORD_GROUPS = {
+  // Eixo 1: Microfrontends (tema central)
+  microfrontend: [
+    'microfrontend',
+    'micro frontend',
+    'micro-frontend',
+    'microfrontends',
+    'micro-frontends',
+  ],
+  // Eixo 2: Tecnologias MFE adjacentes
+  mfe_tech: [
+    'module federation',
+    'webpack module federation',
+    'single-spa framework',
+    'web components architecture',
+  ],
+  // Eixo 3: Technical Debt (foco SATD)
+  technical_debt: [
+    'self-admitted technical debt',
+    'SATD',
+    'technical debt',
+    'architectural technical debt',
+    'software architecture debt',
+    'design debt',
+    'code smell',
+  ],
+  // Eixo 4: Microservices (análogo arquitetural)
+  microservices: [
+    'microservices architecture',
+    'microservice technical debt',
+    'monorepo microservices',
+  ],
+};
+
+// Flatten pra uso no script
+const KEYWORDS = Object.values(KEYWORD_GROUPS).flat();
+
+// Venues específicas pra busca no DBLP
+const DBLP_VENUES = [
+  'MSR',      // Mining Software Repositories
+  'ICSE',     // International Conference on Software Engineering
+  'FSE',      // Foundations of Software Engineering
+  'ASE',      // Automated Software Engineering
+  'ESEM',     // Empirical Software Engineering and Measurement
+  'ICSME',    // International Conference on Software Maintenance and Evolution
+  'SANER',    // Software Analysis, Evolution and Reengineering
+  'TSE',      // IEEE Transactions on Software Engineering
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -167,6 +204,50 @@ async function fetchSemanticScholar(keyword, offset = 0, limit = 100, _retries =
   }));
 }
 
+// ── DBLP API ────────────────────────────────────────────────────
+
+async function fetchDBLP(keyword, first = 0, limit = 100) {
+  const q = encodeURIComponent(keyword);
+  const url = `https://dblp.org/search/publ/api?q=${q}&format=json&h=${limit}&f=${first}`;
+
+  console.log(`  [dblp] buscando "${keyword}" offset=${first}...`);
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'summa-sh-backfill/1.0' },
+  });
+
+  if (!res.ok) throw new Error(`DBLP retornou ${res.status}`);
+  const data = await res.json();
+
+  const hits = data?.result?.hits?.hit || [];
+  return hits.map((h) => {
+    const info = h.info || {};
+    const authors = Array.isArray(info.authors?.author)
+      ? info.authors.author.map((a) => (typeof a === 'string' ? a : a.text || a['#text'] || '')).join(', ')
+      : (typeof info.authors?.author === 'object' ? (info.authors.author.text || info.authors.author['#text'] || '') : '');
+
+    return {
+      title: info.title || 'Sem título',
+      authors,
+      summary: '', // DBLP não retorna abstracts
+      year: info.year ? parseInt(info.year, 10) : null,
+      doi: info.doi || null,
+      url: info.ee || info.url || (info.doi ? `https://doi.org/${info.doi}` : null),
+      source: 'dblp',
+      publishedAt: info.year ? new Date(`${info.year}-01-01`) : null,
+      venue: info.venue || null,
+      type: 'paper_read',
+      language: 'en',
+    };
+  });
+}
+
+/** Busca no DBLP por keyword + venue específica (ex: "technical debt" publicado no MSR). */
+async function fetchDBLPVenue(keyword, venue) {
+  // DBLP aceita busca combinada: "keyword venue:NOME"
+  const q = `${keyword} venue:${venue}`;
+  return fetchDBLP(q, 0, 100);
+}
+
 // ── Deduplicação ────────────────────────────────────────────────
 
 function normalizeTitle(t) {
@@ -208,16 +289,21 @@ async function insertReferences(profileId, items) {
       profile_id: profileId,
       title: item.title,
       authors: item.authors || null,
+      summary: item.summary || null,
       venue: item.venue || null,
       year: item.year,
       doi: item.doi || null,
       url: item.url || null,
+      source: item.source || null,
       type: 'paper_read',
       tags: ['backfill', item.source],
-      personal_note: null,
-      rating: null,
+      language: item.language || 'en',
+      origin: 'backfill',
+      published_at: item.publishedAt ? item.publishedAt.toISOString() : null,
       is_read: false,
       is_favorite: false,
+      is_dismissed: false,
+      is_saved: false,
       created_at: new Date().toISOString(),
     }));
 
@@ -410,10 +496,43 @@ async function main() {
       if (results.length > 0) {
         await flushBatch(results, `s2:"${keyword}"`);
       }
-      // Espera mais entre keywords pra não levar rate limit
       await sleep(5000);
     } catch (err) {
       console.error(`  [s2] erro com "${keyword}": ${err.message}`);
+    }
+  }
+
+  // ── DBLP: busca geral por keyword ──
+  console.log('══ FASE 3: DBLP ══\n');
+  for (const keyword of KEYWORDS) {
+    try {
+      const results = await fetchDBLP(keyword, 0, 100);
+      console.log(`    -> ${results.length} resultados`);
+      if (results.length > 0) {
+        await flushBatch(results, `dblp:"${keyword}"`);
+      }
+      await sleep(1000); // DBLP é generoso com rate limit
+    } catch (err) {
+      console.error(`  [dblp] erro com "${keyword}": ${err.message}`);
+    }
+  }
+
+  // ── DBLP: busca por venue específica (MSR, ICSE, FSE etc.) ──
+  console.log('══ FASE 4: DBLP por venue ══\n');
+  // Só busca as keywords centrais em venues, não todas as variações
+  const venueKeywords = ['technical debt', 'SATD', 'microfrontend', 'micro frontend', 'code smell'];
+  for (const venue of DBLP_VENUES) {
+    for (const keyword of venueKeywords) {
+      try {
+        const results = await fetchDBLPVenue(keyword, venue);
+        console.log(`    -> ${results.length} resultados`);
+        if (results.length > 0) {
+          await flushBatch(results, `dblp:${venue}:"${keyword}"`);
+        }
+        await sleep(1000);
+      } catch (err) {
+        console.error(`  [dblp:${venue}] erro com "${keyword}": ${err.message}`);
+      }
     }
   }
 
