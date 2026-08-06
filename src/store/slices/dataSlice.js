@@ -83,15 +83,44 @@ export const fetchRadarUpdates = createAsyncThunk(
       force,
     });
 
+    // Busca referências existentes pra evitar duplicar no Acervo
+    const existingRefs = (await ReferenceRepo.getAll(profileId)) ?? [];
+    const refTitles = new Set(existingRefs.map(r => (r.title || '').toLowerCase().trim()));
+
     for (const item of newItems) {
+      // 1. Insere no radar_items (Farol)
       await RadarRepo.create(item);
+
+      // 2. Auto-insere no references (Acervo) se não existe ainda
+      const titleNorm = (item.title || '').toLowerCase().trim();
+      if (titleNorm && !refTitles.has(titleNorm)) {
+        try {
+          await ReferenceRepo.create({
+            profileId,
+            title: item.title,
+            authors: item.authors || null,
+            venue: null,
+            year: item.publishedAt ? new Date(item.publishedAt).getFullYear() : null,
+            doi: null,
+            url: item.sourceUrl || null,
+            type: item.type === 'paper' ? 'paper_read' : item.type || 'post',
+            tags: [item.source || 'farol', 'auto'],
+            personalNote: null,
+            rating: null,
+            isRead: false,
+            isFavorite: false,
+          });
+          refTitles.add(titleNorm);
+        } catch (e) {
+          console.warn('[summa] auto-ref falhou:', e.message);
+        }
+      }
     }
 
     for (const update of sourceUpdates) {
       if (update.existingRowId) {
         await SourceRepo.update(update.existingRowId, { lastFetchedAt: update.lastFetchedAt });
       } else {
-        // fonte marcada no perfil mas sem linha em `sources` ainda — cria agora
         await SourceRepo.create({
           profileId,
           name: update.name,
@@ -108,9 +137,45 @@ export const fetchRadarUpdates = createAsyncThunk(
       dispatch(loadRadarItems(profileId)),
       dispatch(loadRadarStats(profileId)),
       dispatch(loadRadarCfps(profileId)),
+      dispatch(loadReferences(profileId)),
     ]);
 
     return { count: newItems.length, errors, skipped };
+  }
+);
+
+/** Promove um item do Farol → Acervo (cria referência e marca promoted_to_ref). */
+export const promoteToReference = createAsyncThunk(
+  'data/promoteToReference',
+  async ({ profileId, item }, { dispatch }) => {
+    // Cria a referência no Acervo
+    const refId = await ReferenceRepo.create({
+      profileId,
+      title: item.title,
+      authors: item.authors || null,
+      venue: null,
+      year: item.publishedAt ? new Date(item.publishedAt).getFullYear() : null,
+      doi: null,
+      url: item.sourceUrl || null,
+      type: item.type === 'paper' ? 'paper_read' : item.type || 'post',
+      tags: [item.source || 'farol', 'promoted'],
+      personalNote: null,
+      rating: null,
+      isRead: item.isRead || false,
+      isFavorite: false,
+    });
+
+    // Marca o radar_item como promovido
+    if (refId && item.id) {
+      await RadarRepo.promoteToRef(item.id, refId);
+    }
+
+    await Promise.all([
+      dispatch(loadReferences(profileId)),
+      dispatch(loadRadarItems(profileId)),
+    ]);
+
+    return { refId, radarItemId: item.id };
   }
 );
 
