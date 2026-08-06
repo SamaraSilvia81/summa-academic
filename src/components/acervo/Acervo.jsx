@@ -7,7 +7,7 @@ import {
   SquaresFour, Rows, FolderPlus, FolderOpen, PencilSimple,
   ShareNetwork, CaretLeft, CaretRight, Folder, Funnel,
   FileImage, FileVideo, FileAudio, FileDoc, FileZip, File as FileGeneric,
-  BookOpenText, BookmarkSimple,
+  BookOpenText, BookmarkSimple, Quotes, Export,
 } from '@phosphor-icons/react';
 import { useReferences } from '../../hooks/useData';
 import { Leitura } from './Leitura';
@@ -21,6 +21,7 @@ import {
   deleteReference,
 } from '../../store/slices/dataSlice';
 import { getReferenceFileUrl } from '../../lib/storage';
+import { copyCitation, exportBibTeX, exportRIS } from '../../lib/citations';
 import { ReferenceFolderRepo } from '../../services/repositories';
 import { PdfThumbnail } from './PdfThumbnail';
 
@@ -178,6 +179,7 @@ export function Acervo({ profileId }) {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [editFolderOpen, setEditFolderOpen] = useState(null);
   const [editRefOpen, setEditRefOpen] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null);
   const [deletingFolder, setDeletingFolder] = useState(false);
   const [toast, setToast] = useState('');
@@ -457,6 +459,38 @@ export function Acervo({ profileId }) {
         }}>
           <Plus size={14} weight="bold" /> ADICIONAR
         </button>
+
+        {/* Exportar referências */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setExportOpen(o => !o)} style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'var(--bg2)', color: 'var(--tx2)', border: '1px solid var(--brd)',
+            borderRadius: 'var(--r-md)', padding: '0 10px', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: 11, height: 33,
+          }}>
+            <Export size={13} /> Exportar
+          </button>
+          {exportOpen && (
+            <div style={{
+              position: 'absolute', top: 38, right: 0, zIndex: 20,
+              background: 'var(--bg1)', border: '1px solid var(--brd2)',
+              borderRadius: 'var(--r-md)', padding: 6, minWidth: 140,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            }}>
+              {[
+                { label: 'BibTeX (.bib)', fn: () => { exportBibTeX(references || []); setExportOpen(false); } },
+                { label: 'RIS (.ris)', fn: () => { exportRIS(references || []); setExportOpen(false); } },
+              ].map(({ label, fn }) => (
+                <button key={label} onClick={fn} style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
+                  padding: '6px 10px', borderRadius: 'var(--r-sm)',
+                }}>{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {filtersOpen && (
@@ -843,6 +877,8 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
   const [hover, setHover] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const [citeMenuOpen, setCiteMenuOpen] = useState(false);
+  const [citeToast, setCiteToast] = useState('');
 
   const typeLabels = {
     paper_read: 'paper', my_article: 'meu art.',
@@ -970,6 +1006,40 @@ function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFo
         <button onClick={e => { e.stopPropagation(); onShare(); }} title="compartilhar link" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
           <ShareNetwork size={13} />
         </button>
+        <div style={{ position: 'relative' }}>
+          <button onClick={e => { e.stopPropagation(); setCiteMenuOpen(v => !v); }} title="copiar citação" className="acervo-card-btn" style={cardBtnStyle}>
+            <Quotes size={13} />
+          </button>
+          {citeMenuOpen && (
+            <div style={{
+              position: 'absolute', bottom: 30, right: 0, zIndex: 20,
+              background: 'var(--bg1)', border: '1px solid var(--brd2)',
+              borderRadius: 'var(--r-md)', padding: 4, minWidth: 100,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            }}>
+              {['abnt', 'apa', 'bibtex'].map(fmt => (
+                <button key={fmt} onClick={async (e) => {
+                  e.stopPropagation();
+                  await copyCitation(reference, fmt);
+                  setCiteMenuOpen(false);
+                  setCiteToast(fmt.toUpperCase());
+                  setTimeout(() => setCiteToast(''), 2000);
+                }} style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
+                  padding: '5px 8px', borderRadius: 'var(--r-sm)',
+                }}>{fmt.toUpperCase()}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        {citeToast && (
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--acc)',
+            fontWeight: 600, padding: '2px 6px',
+          }}>{citeToast} copiado!</span>
+        )}
         {folders.length > 0 && (
           <div style={{ position: 'relative' }}>
             <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} title="adicionar à pasta" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
