@@ -388,49 +388,64 @@ export const ReadingListRepo = {
 // ── Radar Items (Farol) ────────────────────────────────────────
 export const RadarRepo = {
   getAll: (profileId) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('is_dismissed', false).order('fetched_at', { ascending: false })),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('is_dismissed', false).in('origin', ['radar', 'backfill']).order('fetched_at', { ascending: false })),
 
   getByType: (profileId, type) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('type', type).eq('is_dismissed', false).order('relevance_score', { ascending: false })),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('type', type).eq('is_dismissed', false).in('origin', ['radar', 'backfill']).order('relevance_score', { ascending: false })),
 
   getUnread: (profileId) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('is_read', false).eq('is_dismissed', false)),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('is_read', false).eq('is_dismissed', false).in('origin', ['radar', 'backfill'])),
 
   getSaved: (profileId) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('is_saved', true)),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('is_saved', true)),
 
   getHighRelevance: (profileId, minScore = 75) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('is_dismissed', false).gte('relevance_score', minScore).order('relevance_score', { ascending: false })),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('is_dismissed', false).gte('relevance_score', minScore).order('relevance_score', { ascending: false })),
 
   getCfps: (profileId) =>
-    query(supabase.from('radar_items').select('*').eq('profile_id', profileId).eq('type', 'cfp').eq('is_dismissed', false)),
+    query(supabase.from('references').select('*').eq('profile_id', profileId).eq('type', 'cfp').eq('is_dismissed', false)),
 
   getStats: async (profileId) => {
-    const { data, error } = await supabase.rpc('get_radar_stats', { p_profile_id: profileId });
-    if (error) { console.error('[summa]', error.message); return null; }
-    return toCamel(data);
+    // Stats calculadas no client agora (a RPC apontava pra radar_items)
+    const items = await query(
+      supabase.from('references').select('type, source, relevance_score, is_read, is_saved, fetched_at')
+        .eq('profile_id', profileId).in('origin', ['radar', 'backfill'])
+    );
+    if (!items) return null;
+    return {
+      total: items.length,
+      unread: items.filter(i => !i.isRead).length,
+      saved: items.filter(i => i.isSaved).length,
+      avgRelevance: items.length ? Math.round(items.reduce((s, i) => s + (i.relevanceScore || 0), 0) / items.length) : 0,
+    };
   },
 
   create: async (data) => {
+    // Insere direto em references com origin='radar'
+    // Mapeia sourceUrl → url (references usa 'url', não 'source_url')
+    const { sourceUrl, ...rest } = data;
     const row = await queryOne(
-      supabase.from('radar_items').insert(toSnake(data)).select().single()
+      supabase.from('references').insert(toSnake({
+        ...rest,
+        url: sourceUrl || rest.url || null,
+        origin: 'radar',
+        tags: [data.source || 'farol', 'auto'],
+        isFavorite: false,
+      })).select().single()
     );
     return row?.id;
   },
 
   markRead: (id) =>
-    supabase.from('radar_items').update({ is_read: true }).eq('id', id),
+    supabase.from('references').update({ is_read: true }).eq('id', id),
 
   toggleSave: async (id) => {
-    const item = await queryOne(supabase.from('radar_items').select('is_saved').eq('id', id).single());
-    if (item) await supabase.from('radar_items').update({ is_saved: !item.isSaved }).eq('id', id);
+    const item = await queryOne(supabase.from('references').select('is_saved').eq('id', id).single());
+    if (item) await supabase.from('references').update({ is_saved: !item.isSaved }).eq('id', id);
   },
 
   dismiss: (id) =>
-    supabase.from('radar_items').update({ is_dismissed: true }).eq('id', id),
-
-  promoteToRef: async (id, referenceId) =>
-    supabase.from('radar_items').update({ promoted_to_ref: referenceId }).eq('id', id),
+    supabase.from('references').update({ is_dismissed: true }).eq('id', id),
 };
 
 // ── Sources (Farol) ────────────────────────────────────────────

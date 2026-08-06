@@ -3,11 +3,21 @@ import { useDispatch } from 'react-redux';
 import {
   ArrowsClockwise, BookmarkSimple,
   Funnel, ChartBar, Newspaper, Lightning,
-  CalendarBlank, List, CaretLeft, CaretRight, ArchiveBox
+  CalendarBlank, List, CaretLeft, CaretRight
 } from '@phosphor-icons/react';
 import { useRadarItems, useRadarStats, useNotes, useRadarCfps, useRadarFetch } from '../../hooks/useData';
-import { dismissRadarItem, markRadarItemRead, toggleRadarSave, promoteToReference } from '../../store/slices/dataSlice';
+import { dismissRadarItem, markRadarItemRead, toggleRadarSave } from '../../store/slices/dataSlice';
 import { keyToLabel } from '../../lib/sourcesConfig';
+
+function decodeEntities(text) {
+  if (!text) return '';
+  try {
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    return doc.documentElement.textContent || text;
+  } catch {
+    return text;
+  }
+}
 
 const TYPE_META = {
   paper:  { label: 'Paper',   color: '#D4A030', bg: 'rgba(212,160,48,0.15)', solid: '#1a1600' },
@@ -351,7 +361,7 @@ function FeedView({ items, notes, saved, profileId }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {saved && saved.slice(0, 4).map(item => (
-              <div key={item.id} onClick={() => { if(item.sourceUrl) window.open(item.sourceUrl, '_blank'); }} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--brd)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={item.id} onClick={() => { if(item.url) window.open(item.url, '_blank'); }} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg2)', border: '1px solid var(--brd)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{item.title}</span>
                 <span style={{ fontSize: 11, color: 'var(--tx3)', flexShrink: 0 }}>{timeAgo(item.publishedAt)}</span>
               </div>
@@ -401,13 +411,9 @@ function CardRenderer({ item, isLarge, isVertical, dispatch, profileId }) {
   
   const handleClick = () => {
     if (item.id && !item.isRead) dispatch(markRadarItemRead({ profileId, id: item.id }));
-    if (item.sourceUrl) window.open(item.sourceUrl, '_blank');
+    if (item.url) window.open(item.url, '_blank');
   };
   const handleSave = (e) => { e.stopPropagation(); dispatch(toggleRadarSave({ profileId, id: item.id })); };
-  const handlePromote = (e) => {
-    e.stopPropagation();
-    if (!item.promotedToRef) dispatch(promoteToReference({ profileId, item }));
-  };
 
   let height = 280, titleSize = 18;
   if (isLarge) { height = 340; titleSize = 24; }
@@ -435,20 +441,8 @@ function CardRenderer({ item, isLarge, isVertical, dispatch, profileId }) {
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <CardAuthor item={item} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Promover → Acervo */}
-            <div onClick={handlePromote} title={item.promotedToRef ? 'Já no Acervo' : 'Adicionar ao Acervo'} style={{
-              color: item.promotedToRef ? 'var(--acc)' : 'var(--tx)',
-              background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 6,
-              backdropFilter: 'blur(4px)', cursor: item.promotedToRef ? 'default' : 'pointer',
-              opacity: item.promotedToRef ? 0.7 : 1,
-            }}>
-              <ArchiveBox size={15} weight={item.promotedToRef ? 'fill' : 'regular'} />
-            </div>
-            {/* Bookmark */}
-            <div onClick={handleSave} style={{ color: 'var(--tx)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 6, backdropFilter: 'blur(4px)' }}>
-              <BookmarkSimple size={16} weight={item.isSaved ? 'fill' : 'regular'} />
-            </div>
+          <div onClick={handleSave} style={{ color: 'var(--tx)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 6, backdropFilter: 'blur(4px)' }}>
+            <BookmarkSimple size={16} weight={item.isSaved ? 'fill' : 'regular'} />
           </div>
         </div>
         <h3 style={{ fontFamily: 'var(--font-quote)', fontSize: titleSize, fontWeight: 700, color: 'var(--tx)', margin: '8px 0 0', lineHeight: 1.2 }}>{decodeEntities(item.title)}</h3>
