@@ -7,7 +7,8 @@ import {
   SquaresFour, Rows, FolderPlus, FolderOpen, PencilSimple,
   ShareNetwork, CaretLeft, CaretRight, Folder, Funnel,
   FileImage, FileVideo, FileAudio, FileDoc, FileZip, File as FileGeneric,
-  BookOpenText, BookmarkSimple, Quotes, Export,
+  BookOpenText, BookmarkSimple, Quotes, Export, CaretDown, Check,
+  Eye, EyeSlash, SlidersHorizontal, Warning, ArrowRight,
 } from '@phosphor-icons/react';
 import { useReferences } from '../../hooks/useData';
 import { Leitura } from './Leitura';
@@ -163,7 +164,6 @@ export function Acervo({ profileId }) {
     deleteFolder, addRefToFolder,
   } = useReferenceFolders(profileId);
 
-  // ── Derivados das rotas ──
   const [virtualFolder, setVirtualFolder] = useState(null);
   const activeTab = folderId ? 'referencias' : (tab || 'referencias');
   const currentFolder = virtualFolder || folderId || null;
@@ -177,10 +177,14 @@ export function Acervo({ profileId }) {
   const [readingRef, setReadingRef] = useState(null);
   const [activeFilter, setActiveFilter] = useState('todos');
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState('recent');
   const [sortDir, setSortDir] = useState('desc');
   const [filterYear, setFilterYear] = useState('todos');
+  const [filterType, setFilterType] = useState('todos');
+  const [filterStatus, setFilterStatus] = useState('todos');
+  const [filterQualis, setFilterQualis] = useState('todos');
+  const [filterLang, setFilterLang] = useState('todos');
+  const [filterRating, setFilterRating] = useState('todos');
   const [filterHasFile, setFilterHasFile] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [view, setView] = useState('grid');
@@ -188,13 +192,45 @@ export function Acervo({ profileId }) {
   const [editFolderOpen, setEditFolderOpen] = useState(null);
   const [editRefOpen, setEditRefOpen] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [colsMenuOpen, setColsMenuOpen] = useState(false);
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null);
   const [deletingFolder, setDeletingFolder] = useState(false);
   const [toast, setToast] = useState('');
   const [dossieRef, setDossieRef] = useState(null);
   const [page, setPage] = useState(0);
-  const defaultColWidths = [28, 340, 140, 50, 68, 52, 80, 28];
-  const [colWidths, setColWidths] = useState(defaultColWidths);
+  const [openDropdown, setOpenDropdown] = useState(null);
+
+  // ── Seleção múltipla ──
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkExportOpen, setBulkExportOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const ALL_COLS = [
+    { key: 'sel',      label: '',            defaultOn: true,  width: 28 },
+    { key: 'num',      label: '#',           defaultOn: true,  width: 28 },
+    { key: 'title',    label: 'Título',       defaultOn: true,  width: 260 },
+    { key: 'authors',  label: 'Autor',        defaultOn: true,  width: 140 },
+    { key: 'year',     label: 'Ano',          defaultOn: true,  width: 48 },
+    { key: 'type',     label: 'Tipo',         defaultOn: true,  width: 72 },
+    { key: 'status',   label: 'Status',       defaultOn: true,  width: 80 },
+    { key: 'qualis',   label: 'Qualis',       defaultOn: true,  width: 58 },
+    { key: 'rating',   label: 'Avaliação',    defaultOn: true,  width: 72 },
+    { key: 'tags',     label: 'Tags',         defaultOn: true,  width: 140 },
+    { key: 'relevance',label: 'Relevância',   defaultOn: false, width: 90 },
+    { key: 'progress', label: 'Progresso',    defaultOn: false, width: 80 },
+    { key: 'language', label: 'Idioma',       defaultOn: false, width: 58 },
+    { key: 'deadline', label: 'Prazo',        defaultOn: false, width: 80 },
+    { key: 'venue',    label: 'Venue',        defaultOn: false, width: 100 },
+    { key: 'actions',  label: '',             defaultOn: true,  width: 28 },
+  ];
+  const [visibleCols, setVisibleCols] = useState(() =>
+    Object.fromEntries(ALL_COLS.map(c => [c.key, c.defaultOn]))
+  );
+  const [colWidths, setColWidths] = useState(() =>
+    Object.fromEntries(ALL_COLS.map(c => [c.key, c.width]))
+  );
   const resizingCol = useRef(null);
   const PER_PAGE = 20;
 
@@ -210,13 +246,16 @@ export function Acervo({ profileId }) {
     new Set((references || []).map((r) => r.year).filter(Boolean))
   ).sort((a, b) => b - a);
 
-  const hasActiveFilters = sortBy !== 'recent' || filterYear !== 'todos' || filterHasFile;
+  const hasActiveFilters = sortBy !== 'recent' || filterYear !== 'todos' || filterHasFile
+    || filterType !== 'todos' || filterStatus !== 'todos' || filterQualis !== 'todos'
+    || filterLang !== 'todos' || filterRating !== 'todos';
 
   function clearFilters() {
-    setSortBy('recent');
-    setSortDir('desc');
-    setFilterYear('todos');
-    setFilterHasFile(false);
+    setSortBy('recent'); setSortDir('desc');
+    setFilterYear('todos'); setFilterHasFile(false);
+    setFilterType('todos'); setFilterStatus('todos');
+    setFilterQualis('todos'); setFilterLang('todos');
+    setFilterRating('todos');
     setPage(0);
   }
 
@@ -230,19 +269,15 @@ export function Acervo({ profileId }) {
     setPage(0);
   }
 
-  function startResize(colIdx, e) {
+  function startResize(colKey, e) {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startW = colWidths[colIdx];
-    resizingCol.current = colIdx;
+    const startW = colWidths[colKey];
+    resizingCol.current = colKey;
     const onMove = (ev) => {
       const delta = ev.clientX - startX;
-      setColWidths(prev => {
-        const next = [...prev];
-        next[colIdx] = Math.max(28, startW + delta);
-        return next;
-      });
+      setColWidths(prev => ({ ...prev, [colKey]: Math.max(40, startW + delta) }));
     };
     const onUp = () => {
       resizingCol.current = null;
@@ -257,8 +292,8 @@ export function Acervo({ profileId }) {
     if (!currentFolder) return true;
     if (currentFolder === '__read__') return ref.isRead;
     if (currentFolder === '__unread__') return !ref.isRead;
-    if (isInbox) return !refsInAnyFolder.has(ref.id); // inbox: orphans
-    if (folderRefIds) return folderRefIds.has(ref.id); // specific folder
+    if (isInbox) return !refsInAnyFolder.has(ref.id);
+    if (folderRefIds) return folderRefIds.has(ref.id);
     return true;
   }).filter((ref) => {
     if (activeFilter === 'papers') return ref.type === 'paper_read';
@@ -275,13 +310,20 @@ export function Acervo({ profileId }) {
     return ref.title.toLowerCase().includes(q) ||
       ref.authors?.toLowerCase().includes(q) ||
       (ref.tags || []).some((t) => t.toLowerCase().includes(q));
-  }).filter((ref) => {
-    if (filterYear === 'todos') return true;
-    return String(ref.year) === String(filterYear);
-  }).filter((ref) => {
-    if (!filterHasFile) return true;
-    return !!ref.filePath;
-  }).sort((a, b) => {
+  }).filter((ref) => filterYear === 'todos' || String(ref.year) === String(filterYear))
+    .filter((ref) => !filterHasFile || !!ref.filePath)
+    .filter((ref) => filterType === 'todos' || ref.type === filterType)
+    .filter((ref) => {
+      if (filterStatus === 'todos') return true;
+      if (filterStatus === 'lido') return ref.isRead;
+      if (filterStatus === 'nao_lido') return !ref.isRead;
+      if (filterStatus === 'lendo') return ref.readingStatus === 'reading';
+      return true;
+    })
+    .filter((ref) => filterQualis === 'todos' || ref.qualis === filterQualis)
+    .filter((ref) => filterLang === 'todos' || ref.language === filterLang)
+    .filter((ref) => filterRating === 'todos' || String(ref.rating) === String(filterRating))
+    .sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1;
     if (sortBy === 'title') return dir * (a.title || '').localeCompare(b.title || '');
     if (sortBy === 'author') return dir * (a.authors || '').localeCompare(b.authors || '');
@@ -293,6 +335,85 @@ export function Acervo({ profileId }) {
   });
 
   const isEmpty = filtered.length === 0;
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const paged = filtered.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
+
+  // IDs da página atual (para select-all)
+  const pagedIds = paged.map(r => r.id);
+  const allPageSelected = pagedIds.length > 0 && pagedIds.every(id => selectedIds.has(id));
+  const somePageSelected = pagedIds.some(id => selectedIds.has(id));
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pagedIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pagedIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  function toggleSelect(id, e) {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setBulkMoveOpen(false);
+    setBulkDeleteConfirm(false);
+    setBulkExportOpen(false);
+  }
+
+  async function bulkMoveToFolder(folderId) {
+    setBulkBusy(true);
+    try {
+      for (const refId of selectedIds) {
+        await addRefToFolder(refId, folderId);
+      }
+      showToast(`${selectedIds.size} refs movidas`);
+      clearSelection();
+    } finally {
+      setBulkBusy(false);
+      setBulkMoveOpen(false);
+    }
+  }
+
+  async function bulkDelete() {
+    setBulkBusy(true);
+    try {
+      const toDelete = (references || []).filter(r => selectedIds.has(r.id));
+      for (const ref of toDelete) {
+        await dispatch(deleteReference({ profileId, reference: ref })).unwrap().catch(() => {});
+      }
+      showToast(`${toDelete.length} refs apagadas`);
+      clearSelection();
+    } finally {
+      setBulkBusy(false);
+      setBulkDeleteConfirm(false);
+    }
+  }
+
+  function bulkExport(fmt) {
+    const toExport = (references || []).filter(r => selectedIds.has(r.id));
+    if (fmt === 'bibtex') exportBibTeX(toExport);
+    else exportRIS(toExport);
+    setBulkExportOpen(false);
+    showToast(`${toExport.length} refs exportadas`);
+  }
 
   function showToast(msg) {
     setToast(msg);
@@ -331,6 +452,7 @@ export function Acervo({ profileId }) {
 
   return (
     <div className="animate-fade-in">
+      {/* ── Hero Banner ── */}
       <div style={{
         width: '100%', borderRadius: 'var(--r-xl)', overflow: 'hidden',
         margin: '14px 0 20px', position: 'relative',
@@ -434,180 +556,10 @@ export function Acervo({ profileId }) {
 
       {activeTab === 'referencias' && (<>
 
-      {/* ── Pastas ── */}
-      <div style={{
-        display: 'flex', gap: 6, marginBottom: 8, alignItems: 'stretch', flexWrap: 'wrap',
-      }}>
-        {[
-          { id: null, name: 'Todas', icon: '◉', color: 'var(--acc)', count: (references || []).length },
-          { id: '__inbox__', name: 'Inbox', icon: '◌', color: '#8A8680', count: inboxCount },
-          { id: '__read__', name: 'Lidos', icon: '✓', color: '#4ADE80', count: (references || []).filter(r => r.isRead).length },
-          { id: '__unread__', name: 'Não lidos', icon: '○', color: 'var(--tx3)', count: (references || []).filter(r => !r.isRead).length },
-          ...folders.map(f => ({ id: f.id, name: f.name, icon: '▪', color: f.color || 'var(--acc)', count: (f.refIds || []).length })),
-        ].map(f => {
-          const isActive = currentFolder === f.id;
-          return (
-            <button
-              key={f.id || '__all__'}
-              onClick={() => { setCurrentFolder(f.id); setPage(0); if (f.id === null) setActiveFilter('todos'); }}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                padding: '8px 14px', cursor: 'pointer', minWidth: 80,
-                border: isActive ? '1px solid ' + f.color : '1px solid var(--brd)',
-                background: isActive ? f.color + '10' : 'var(--bg1)',
-                transition: 'all 0.12s',
-              }}
-            >
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9, color: isActive ? f.color : 'var(--tx3)',
-                letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <span style={{ fontSize: 8 }}>{f.icon}</span> {f.name}
-              </span>
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
-                color: isActive ? f.color : 'var(--tx2)', marginTop: 2,
-              }}>
-                {f.count}
-              </span>
-            </button>
-          );
-        })}
-        <button onClick={() => setNewFolderOpen(true)} title="nova pasta" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--bg1)', border: '1px dashed var(--brd)',
-          padding: '8px 14px', cursor: 'pointer', color: 'var(--tx3)', minWidth: 50,
-        }}>
-          <FolderPlus size={14} />
-        </button>
-      </div>
-
-      {/* ── Barra de ações ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-      }}>
-        <div style={{ display: 'flex', gap: 3, flex: 1, flexWrap: 'wrap' }}>
-          {FILTERS.map((f) => (
-            <button key={f} onClick={() => { setActiveFilter(f); setPage(0); }} style={{
-              fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500,
-              padding: '3px 8px', cursor: 'pointer',
-              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid var(--brd)',
-              background: activeFilter === f ? 'var(--acc-bg)' : 'transparent',
-              color: activeFilter === f ? 'var(--acc)' : 'var(--tx3)',
-              transition: 'all 0.12s', textTransform: 'uppercase', letterSpacing: '0.04em',
-            }}>
-              {f}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setFiltersOpen(v => !v)} style={{
-          display: 'flex', alignItems: 'center', gap: 3,
-          background: filtersOpen || hasActiveFilters ? 'var(--acc-bg)' : 'transparent',
-          border: '1px solid ' + (filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--brd)'),
-          padding: '3px 8px', cursor: 'pointer',
-          color: filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--tx3)',
-          fontFamily: 'var(--font-mono)', fontSize: 9,
-        }}>
-          <Funnel size={10} weight={hasActiveFilters ? 'fill' : 'regular'} /> filtros
-        </button>
-        <button onClick={() => setAddOpen(true)} style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          background: 'var(--acc)', color: 'var(--bg0)', border: 'none',
-          padding: '4px 12px', cursor: 'pointer',
-          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-          textTransform: 'uppercase',
-        }}>
-          <Plus size={10} weight="bold" /> adicionar
-        </button>
-        <div style={{ position: 'relative' }}>
-          <button onClick={() => setExportOpen(o => !o)} style={{
-            display: 'flex', alignItems: 'center', gap: 3,
-            background: 'transparent', color: 'var(--tx3)', border: '1px solid var(--brd)',
-            padding: '4px 10px', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 9,
-          }}>
-            <Export size={10} /> exportar
-          </button>
-          {exportOpen && (
-            <div style={{
-              position: 'absolute', top: 28, right: 0, zIndex: 20,
-              background: 'var(--bg1)', border: '1px solid var(--brd2)',
-              borderRadius: 'var(--r-md)', padding: 4, minWidth: 120,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            }}>
-              {[
-                { label: 'BibTeX (.bib)', fn: () => { exportBibTeX(references || []); setExportOpen(false); } },
-                { label: 'RIS (.ris)', fn: () => { exportRIS(references || []); setExportOpen(false); } },
-              ].map(({ label, fn }) => (
-                <button key={label} onClick={fn} style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx2)',
-                  padding: '5px 8px',
-                }}>{label}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {filtersOpen && (
-        <div style={{
-          background: 'var(--bg1)', border: '1px solid var(--brd)',
-          padding: '8px 12px', marginBottom: 8,
-          display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14,
-        }}>
-          <div>
-            <label style={labelStyle}>ordenar</label>
-            <div style={{ display: 'flex', gap: 3 }}>
-              {SORT_OPTIONS.map(opt => (
-                <button key={opt.value} onClick={() => setSortBy(opt.value)} style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', cursor: 'pointer',
-                  border: sortBy === opt.value ? '1px solid var(--acc)' : '1px solid var(--brd)',
-                  background: sortBy === opt.value ? 'var(--acc-bg)' : 'transparent',
-                  color: sortBy === opt.value ? 'var(--acc)' : 'var(--tx3)',
-                }}>{opt.label}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label style={labelStyle}>ano</label>
-            <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{
-              background: 'var(--bg2)', border: '1px solid var(--brd2)',
-              padding: '3px 6px', color: 'var(--tx)', fontFamily: 'var(--font-mono)', fontSize: 10,
-              outline: 'none', cursor: 'pointer',
-            }}>
-              <option value="todos">todos</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={filterHasFile} onChange={e => setFilterHasFile(e.target.checked)} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx2)' }}>c/ arquivo</span>
-          </label>
-          {hasActiveFilters && (
-            <button onClick={clearFilters} style={{
-              marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
-              textDecoration: 'underline', padding: 0,
-            }}>limpar</button>
-          )}
-        </div>
-      )}
-
-      {/* ── Tabela ── */}
+      {/* ── Toolbar principal ── */}
       {(() => {
-        const totalPages = Math.ceil(filtered.length / PER_PAGE);
-        const safePage = Math.min(page, Math.max(0, totalPages - 1));
-        const paged = filtered.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
-        const sortArrow = (col) => sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
-        const thS = (col) => ({
-          fontFamily: 'var(--font-mono)', fontSize: 9, color: sortBy === col ? 'var(--acc)' : 'var(--tx3)',
-          letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600,
-          cursor: 'pointer', userSelect: 'none', padding: '7px 4px',
-          transition: 'color 0.12s', whiteSpace: 'nowrap',
-        });
+        const availableLangs = [...new Set((references||[]).map(r=>r.language).filter(Boolean))];
+        const availableQualis = ['A1','A2','A3','A4','B1','B2','B3','B4','C'];
         const TC = {
           paper_read:'#D4A030',my_article:'#D4A030',dataset:'#4ADE80',
           book:'#F472B6',thesis:'#60A5FA',note:'#8A8680',
@@ -622,106 +574,766 @@ export function Acervo({ profileId }) {
           paper_read:'papers',book:'livros',post:'artigos',thread:'artigos',
           news:'artigos',my_article:'meus artigos',dataset:'datasets',note:'notas',
         };
-        const cols = colWidths.map(w => w + 'px').join(' ');
 
-        return filtered.length > 0 ? (<>
-        <div style={{ border: '1px solid var(--brd)', background: 'var(--bg1)', overflowX: 'auto', overflowY: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--brd2)', padding: '0 8px', columnGap: 8 }}>
-            {[
-              { key: '', label: '#', sort: false },
-              { key: 'title', label: 'título' },
-              { key: 'author', label: 'autor' },
-              { key: 'year', label: 'ano' },
-              { key: 'type', label: 'tipo' },
-              { key: 'status', label: 'status' },
-              { key: '', label: 'fonte', sort: false },
-              { key: '', label: '', sort: false },
-            ].map((col, i) => (
-              <span key={i} style={{
-                ...thS(col.key),
-                cursor: col.sort === false ? 'default' : 'pointer',
-                position: 'relative', display: 'flex', alignItems: 'center',
-                textAlign: i === 0 ? 'center' : undefined,
-                justifyContent: i === 0 ? 'center' : undefined,
-              }}
-                onClick={col.sort !== false ? () => handleSort(col.key) : undefined}
+        // Dropdown inline reutilizável
+        const FilterDrop = ({ id, label, value, options, onChange, color }) => {
+          const isActive = value !== 'todos';
+          return (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setOpenDropdown(openDropdown === id ? null : id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                  padding: '4px 8px', cursor: 'pointer', borderRadius: 4,
+                  border: `1px solid ${isActive ? (color||'var(--acc)') : 'var(--brd)'}`,
+                  background: isActive ? `${color||'var(--acc)'}18` : 'var(--bg2)',
+                  color: isActive ? (color||'var(--acc)') : 'var(--tx2)',
+                  transition: 'all 0.12s', whiteSpace: 'nowrap',
+                }}
               >
-                {col.label}{col.sort !== false ? sortArrow(col.key) : ''}
-                {i > 0 && i < 7 && (
-                  <span
-                    onMouseDown={e => startResize(i, e)}
+                {label} {isActive && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: 0.8 }}>· {options.find(o=>o.v===value)?.l || value}</span>}
+                <CaretDown size={9} weight={openDropdown === id ? 'bold' : 'regular'} />
+              </button>
+              {openDropdown === id && (
+                <div
+                  style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
+                    background: 'var(--bg1)', border: '1px solid var(--brd2)',
+                    borderRadius: 6, padding: '4px 0', minWidth: 140,
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {options.map(opt => (
+                    <button key={opt.v} onClick={() => { onChange(opt.v); setOpenDropdown(null); setPage(0); }} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '6px 12px', background: 'none', border: 'none',
+                      cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: value === opt.v ? (color||'var(--acc)') : 'var(--tx2)',
+                      textAlign: 'left',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      {opt.dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: opt.dot, display: 'inline-block', marginRight: 6, flexShrink: 0 }} />}
+                      {opt.l}
+                      {value === opt.v && <Check size={10} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        // Colunas visíveis calculadas (sem 'sel' no menu de colunas)
+        const activeCols = ALL_COLS.filter(c => visibleCols[c.key]);
+        const gridTemplate = activeCols.map(c => colWidths[c.key] + 'px').join(' ');
+
+        const sortArrow = (col) => sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+
+        // Status badge
+        const StatusBadge = ({ ref: r }) => {
+          const rs = r.readingStatus;
+          if (rs === 'reading') return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: '#60A5FA', background: '#60A5FA18', border: '1px solid #60A5FA44', borderRadius: 3, padding: '1px 6px' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#60A5FA' }} /> lendo
+            </span>
+          );
+          if (r.isRead) return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: '#4ADE80', background: '#4ADE8018', border: '1px solid #4ADE8044', borderRadius: 3, padding: '1px 6px' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80' }} /> lido
+            </span>
+          );
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', background: 'var(--bg3)', border: '1px solid var(--brd)', borderRadius: 3, padding: '1px 6px' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--tx3)' }} /> para ler
+            </span>
+          );
+        };
+
+        const QualisBadge = ({ q }) => {
+          if (!q) return <span style={{ color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 9 }}>—</span>;
+          const qc = { A1:'#4ADE80', A2:'#86EFAC', A3:'#6EE7B7', A4:'#A7F3D0', B1:'#60A5FA', B2:'#93C5FD', B3:'#BAD7FD', B4:'#DBEAFE', C:'#8A8680' };
+          return (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, color: qc[q]||'var(--tx3)', background: `${qc[q]||'#8A8680'}18`, border: `1px solid ${qc[q]||'#8A8680'}44`, borderRadius: 3, padding: '1px 6px' }}>{q}</span>
+          );
+        };
+
+        const RatingCell = ({ r }) => {
+          if (!r) return <span style={{ color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 9 }}>—</span>;
+          return (
+            <span style={{ display: 'flex', gap: 1 }}>
+              {[1,2,3,4,5].map(n => <Star key={n} size={9} weight={n<=r?'fill':'regular'} color={n<=r?'#D4A030':'var(--tx3)'} style={{ opacity: n<=r?1:0.25 }} />)}
+            </span>
+          );
+        };
+
+        const RelevanceBar = ({ score }) => {
+          if (score == null) return <span style={{ color: 'var(--tx3)', fontSize: 9 }}>—</span>;
+          const pct = Math.min(100, Math.max(0, score));
+          const c = pct >= 70 ? '#4ADE80' : pct >= 40 ? '#D4A030' : '#F87171';
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ flex: 1, height: 4, background: 'var(--bg3)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: pct+'%', height: '100%', background: c, borderRadius: 2 }} />
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: c, flexShrink: 0 }}>{pct}</span>
+            </div>
+          );
+        };
+
+        const ProgressBar = ({ pct }) => {
+          if (pct == null) return <span style={{ color: 'var(--tx3)', fontSize: 9 }}>—</span>;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ flex: 1, height: 4, background: 'var(--bg3)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: pct+'%', height: '100%', background: '#60A5FA', borderRadius: 2 }} />
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', flexShrink: 0 }}>{pct}%</span>
+            </div>
+          );
+        };
+
+        const DeadlineBadge = ({ d }) => {
+          if (!d) return <span style={{ color: 'var(--tx3)', fontSize: 9 }}>—</span>;
+          const dt = new Date(d);
+          const now = new Date();
+          const diff = (dt - now) / (1000*60*60*24);
+          const c = diff < 3 ? '#F87171' : diff < 7 ? '#D4A030' : 'var(--tx3)';
+          return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontFamily: 'var(--font-mono)', fontSize: 9, color: c }}>
+              {diff < 7 && <Warning size={9} weight="fill" />}
+              {dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+            </span>
+          );
+        };
+
+        // Células de cada coluna
+        const renderCell = (colKey, ref, idx) => {
+          const tc = TC[ref.type] || '#8A8680';
+          const tl = TL[ref.type] || ref.type;
+          const rowNum = safePage * PER_PAGE + idx + 1;
+          const isSelected = selectedIds.has(ref.id);
+
+          switch(colKey) {
+            case 'sel':
+              return (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={e => toggleSelect(ref.id, e)}
                     style={{
-                      position: 'absolute', right: -2, top: 0, bottom: 0, width: 5,
-                      cursor: 'col-resize', zIndex: 5,
+                      width: 13, height: 13, cursor: 'pointer',
+                      accentColor: 'var(--acc)',
                     }}
                   />
-                )}
-              </span>
-            ))}
-          </div>
-
-          {paged.map((ref, idx) => {
-            const tc = TC[ref.type] || '#8A8680';
-            const tl = TL[ref.type] || ref.type;
-            const rowNum = safePage * PER_PAGE + idx + 1;
-            const srcName = ref.source || ref.venue || '';
-
-            return (
-              <div
-                key={ref.id}
-                onClick={() => setDossieRef(ref)}
-                draggable
-                onDragStart={e => e.dataTransfer.setData('text/plain', ref.id)}
-                style={{
-                  display: 'grid', gridTemplateColumns: cols,
-                  padding: '0 8px', cursor: 'pointer', columnGap: 8,
-                  borderBottom: '1px solid var(--brd)',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>{rowNum}</span>
-                <div style={{ padding: '6px 4px', minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{ref.title}</div>
-                </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{ref.authors || '—'}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.year || '—'}</span>
-                <span onClick={e => { e.stopPropagation(); const fk = TF[ref.type]; if (fk) { setActiveFilter(fk); setPage(0); } }} title={'filtrar: ' + tl} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: tc, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
-                  <span style={{ width: 4, height: 4, background: tc, flexShrink: 0 }} />{tl}
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: ref.isRead ? '#4ADE80' : 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.isRead ? 'lido' : 'novo'}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{srcName || '—'}</span>
+              );
+            case 'num':
+              return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>{rowNum}</span>;
+            case 'title':
+              return (
+                <div style={{ padding: '7px 4px', minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{ref.title}</div>
+                  {ref.venue && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1, opacity: 0.6 }}>{ref.venue}</div>}
+                </div>
+              );
+            case 'authors':
+              return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{ref.authors || '—'}</span>;
+            case 'year':
+              return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.year || '—'}</span>;
+            case 'type':
+              return (
+                <span onClick={e => { e.stopPropagation(); const fk = TF[ref.type]; if (fk) { setActiveFilter(fk); setPage(0); }}} title={'filtrar: '+tl} style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: tc, background: tc+'18', border: `1px solid ${tc}44`, borderRadius: 3, padding: '1px 5px' }}>{tl}</span>
+                </span>
+              );
+            case 'status':
+              return <span style={{ display: 'flex', alignItems: 'center' }}><StatusBadge ref={ref} /></span>;
+            case 'qualis':
+              return <span style={{ display: 'flex', alignItems: 'center' }}><QualisBadge q={ref.qualis} /></span>;
+            case 'rating':
+              return <span style={{ display: 'flex', alignItems: 'center' }}><RatingCell r={ref.rating} /></span>;
+            case 'tags':
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', flexWrap: 'nowrap' }}>
+                  {(ref.tags||[]).slice(0,3).map(tag => {
+                    const tagColors = ['#7C3AED','#0891B2','#059669','#B45309','#BE185D','#1D4ED8'];
+                    const ci = Math.abs(tag.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % tagColors.length;
+                    const tc2 = tagColors[ci];
+                    return <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: tc2, background: tc2+'18', border: `1px solid ${tc2}44`, borderRadius: 3, padding: '1px 5px', whiteSpace: 'nowrap' }}>{tag}</span>;
+                  })}
+                  {(ref.tags||[]).length > 3 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)' }}>+{ref.tags.length-3}</span>}
+                  {!(ref.tags||[]).length && <span style={{ color: 'var(--tx3)', fontSize: 9 }}>—</span>}
+                </div>
+              );
+            case 'relevance':
+              return <span style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '0 4px' }}><RelevanceBar score={ref.relevanceScore} /></span>;
+            case 'progress':
+              return <span style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '0 4px' }}><ProgressBar pct={ref.readingProgress} /></span>;
+            case 'language':
+              return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.language || '—'}</span>;
+            case 'deadline':
+              return <span style={{ display: 'flex', alignItems: 'center' }}><DeadlineBadge d={ref.deadline} /></span>;
+            case 'venue':
+              return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{ref.venue||ref.source||'—'}</span>;
+            case 'actions':
+              return (
                 <span style={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
                   {ref.isFavorite && <Star size={9} weight="fill" color="#D4A030" />}
                   {ref.filePath && <FilePdf size={9} color="var(--tx3)" />}
                 </span>
-              </div>
-            );
-          })}
+              );
+            default: return null;
+          }
+        };
 
-          <div style={{ padding: '6px 8px', borderTop: '1px solid var(--brd)', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', justifyContent: 'space-between' }}>
-            <span>{filtered.length} ref{filtered.length !== 1 ? 's' : ''}</span>
-            {totalPages > 1 && <span>pág. {safePage + 1} de {totalPages}</span>}
+        // ── PASTAS — fichário lateral com estilo de etiqueta ──
+        const folderTabs = [
+          { id: null, name: 'Todas', color: 'var(--acc)', count: (references||[]).length },
+          { id: '__inbox__', name: 'Inbox', color: '#8A8680', count: inboxCount },
+          { id: '__read__', name: 'Lidos', color: '#4ADE80', count: (references||[]).filter(r=>r.isRead).length },
+          { id: '__unread__', name: 'Não lidos', color: '#F87171', count: (references||[]).filter(r=>!r.isRead).length },
+          ...folders.map(f => ({ id: f.id, name: f.name, color: f.color||'var(--acc)', count: (f.refIds||[]).length })),
+        ];
+
+        return (<>
+
+        {/* ── Toolbar (filtros + ações) ── */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}
+          onClick={() => openDropdown && setOpenDropdown(null)}
+        >
+          <FilterDrop
+            id="tipo" label="Tipo ▾" value={filterType} onChange={setFilterType}
+            options={[
+              { v:'todos', l:'Todos os tipos' },
+              { v:'paper_read', l:'Paper', dot:'#D4A030' },
+              { v:'my_article', l:'Meu artigo', dot:'#D4A030' },
+              { v:'book', l:'Livro', dot:'#F472B6' },
+              { v:'thesis', l:'Tese', dot:'#60A5FA' },
+              { v:'dataset', l:'Dataset', dot:'#4ADE80' },
+              { v:'note', l:'Nota', dot:'#8A8680' },
+              { v:'post', l:'Artigo/Post', dot:'#7B9EE0' },
+              { v:'news', l:'Notícia', dot:'#F87171' },
+            ]}
+          />
+          <FilterDrop
+            id="status" label="Status ▾" value={filterStatus} onChange={setFilterStatus}
+            color="#60A5FA"
+            options={[
+              { v:'todos', l:'Todos' },
+              { v:'nao_lido', l:'Para ler', dot:'var(--tx3)' },
+              { v:'lendo', l:'Lendo', dot:'#60A5FA' },
+              { v:'lido', l:'Lido', dot:'#4ADE80' },
+            ]}
+          />
+          <FilterDrop
+            id="qualis" label="Qualis ▾" value={filterQualis} onChange={setFilterQualis}
+            color="#4ADE80"
+            options={[{ v:'todos', l:'Todos' }, ...availableQualis.map(q=>({ v:q, l:q }))]}
+          />
+          <FilterDrop
+            id="ano" label="Ano ▾" value={filterYear} onChange={setFilterYear}
+            color="#A78BFA"
+            options={[{ v:'todos', l:'Todos os anos' }, ...availableYears.map(y=>({ v:String(y), l:String(y) }))]}
+          />
+          {availableLangs.length > 0 && (
+            <FilterDrop
+              id="lang" label="Idioma ▾" value={filterLang} onChange={setFilterLang}
+              color="#F472B6"
+              options={[{ v:'todos', l:'Todos' }, ...availableLangs.map(l=>({ v:l, l }))]}
+            />
+          )}
+          <FilterDrop
+            id="rating" label="Avaliação ▾" value={filterRating} onChange={setFilterRating}
+            color="#D4A030"
+            options={[{ v:'todos', l:'Todas' }, ...([5,4,3,2,1].map(n=>({ v:String(n), l:'★'.repeat(n)+'☆'.repeat(5-n) })))]}
+          />
+
+          {hasActiveFilters && (
+            <button onClick={clearFilters} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
+              textDecoration: 'underline', padding: '4px 0',
+            }}>limpar filtros</button>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Dropdown colunas */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setColsMenuOpen(v => !v)} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: 4,
+              padding: '4px 8px', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx2)',
+            }}>
+              <SlidersHorizontal size={11} /> Colunas <CaretDown size={9} />
+            </button>
+            {colsMenuOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 60,
+                background: 'var(--bg1)', border: '1px solid var(--brd2)',
+                borderRadius: 6, padding: '6px 0', minWidth: 160,
+                boxShadow: '0 8px 28px rgba(0,0,0,0.45)', marginTop: 4,
+              }}>
+                {ALL_COLS.filter(c=>c.key!=='num'&&c.key!=='actions'&&c.key!=='sel').map(col => (
+                  <button key={col.key} onClick={() => setVisibleCols(prev => ({ ...prev, [col.key]: !prev[col.key] }))} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '6px 12px', background: 'none', border: 'none',
+                    cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
+                    color: visibleCols[col.key] ? 'var(--tx)' : 'var(--tx3)', textAlign: 'left',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background='var(--bg2)'}
+                    onMouseLeave={e => e.currentTarget.style.background='none'}
+                  >
+                    {col.label}
+                    {visibleCols[col.key] ? <Eye size={11} color="var(--acc)" /> : <EyeSlash size={11} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* + Adicionar */}
+          <button onClick={() => setAddOpen(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: 'var(--acc)', color: 'var(--bg0)', border: 'none',
+            padding: '5px 12px', cursor: 'pointer', borderRadius: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            <Plus size={10} weight="bold" /> adicionar
+          </button>
+
+          {/* Exportar */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setOpenDropdown(openDropdown==='export'?null:'export')} style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              background: 'var(--bg2)', color: 'var(--tx3)', border: '1px solid var(--brd)', borderRadius: 4,
+              padding: '5px 10px', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+            }}>
+              <Export size={10} /> exportar <CaretDown size={9} />
+            </button>
+            {openDropdown === 'export' && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50,
+                background: 'var(--bg1)', border: '1px solid var(--brd2)',
+                borderRadius: 6, padding: '4px 0', minWidth: 130,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              }}>
+                {[
+                  { label: 'BibTeX (.bib)', fn: () => { exportBibTeX(references||[]); setOpenDropdown(null); } },
+                  { label: 'RIS (.ris)', fn: () => { exportRIS(references||[]); setOpenDropdown(null); } },
+                ].map(({ label, fn }) => (
+                  <button key={label} onClick={fn} style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
+                    padding: '6px 12px',
+                  }}
+                    onMouseEnter={e=>e.currentTarget.style.background='var(--bg2)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='none'}
+                  >{label}</button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-            <button disabled={safePage === 0} onClick={() => setPage(p => Math.max(0, p - 1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage === 0 ? 'var(--tx3)' : 'var(--tx2)', padding: '3px 10px', cursor: safePage === 0 ? 'default' : 'pointer', opacity: safePage === 0 ? 0.4 : 1, fontFamily: 'var(--font-mono)', fontSize: 10 }}>anterior</button>
-            <span style={{ color: 'var(--tx3)' }}>{safePage + 1} / {totalPages}</span>
-            <button disabled={safePage >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage >= totalPages - 1 ? 'var(--tx3)' : 'var(--tx2)', padding: '3px 10px', cursor: safePage >= totalPages - 1 ? 'default' : 'pointer', opacity: safePage >= totalPages - 1 ? 0.4 : 1, fontFamily: 'var(--font-mono)', fontSize: 10 }}>próxima</button>
+        {/* ── Bulk Action Bar ── aparece quando tem seleção */}
+        {selectedIds.size > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+            padding: '8px 12px',
+            background: 'linear-gradient(90deg, var(--acc)12, var(--bg2))',
+            border: '1px solid var(--acc)44',
+            borderRadius: 6,
+          }}>
+            {/* Badge contagem */}
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+              color: 'var(--acc)', background: 'var(--acc)18',
+              border: '1px solid var(--acc)44',
+              borderRadius: 3, padding: '2px 8px', flexShrink: 0,
+            }}>
+              {selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}
+            </span>
+
+            {/* Mover para pasta */}
+            {folders.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setBulkMoveOpen(v => !v)}
+                  disabled={bulkBusy}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                    padding: '4px 10px', cursor: 'pointer', borderRadius: 4,
+                    border: '1px solid var(--brd2)',
+                    background: 'var(--bg2)', color: 'var(--tx2)',
+                  }}
+                >
+                  <Folder size={11} /> mover para <CaretDown size={9} />
+                </button>
+                {bulkMoveOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 60,
+                    background: 'var(--bg1)', border: '1px solid var(--brd2)',
+                    borderRadius: 6, padding: '4px 0', minWidth: 160,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {folders.map(f => (
+                      <button key={f.id} onClick={() => bulkMoveToFolder(f.id)} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        padding: '7px 12px', background: 'none', border: 'none',
+                        cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
+                        color: 'var(--tx)', textAlign: 'left',
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.color||'var(--acc)', flexShrink: 0 }} />
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Exportar selecionados */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setBulkExportOpen(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                  padding: '4px 10px', cursor: 'pointer', borderRadius: 4,
+                  border: '1px solid var(--brd2)',
+                  background: 'var(--bg2)', color: 'var(--tx2)',
+                }}
+              >
+                <Export size={11} /> exportar <CaretDown size={9} />
+              </button>
+              {bulkExportOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 60,
+                  background: 'var(--bg1)', border: '1px solid var(--brd2)',
+                  borderRadius: 6, padding: '4px 0', minWidth: 130,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                }}>
+                  {[
+                    { label: 'BibTeX (.bib)', fn: () => bulkExport('bibtex') },
+                    { label: 'RIS (.ris)', fn: () => bulkExport('ris') },
+                  ].map(({ label, fn }) => (
+                    <button key={label} onClick={fn} style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
+                      padding: '6px 12px',
+                    }}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--bg2)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='none'}
+                    >{label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Deletar selecionados */}
+            {!bulkDeleteConfirm ? (
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                  padding: '4px 10px', cursor: 'pointer', borderRadius: 4,
+                  border: '1px solid rgba(248,113,113,0.3)',
+                  background: 'rgba(248,113,113,0.06)', color: '#F87171',
+                }}
+              >
+                <Trash size={11} /> apagar
+              </button>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#F87171' }}>
+                  apagar {selectedIds.size}? 
+                </span>
+                <button onClick={bulkDelete} disabled={bulkBusy} style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                  padding: '3px 10px', borderRadius: 3, cursor: 'pointer',
+                  background: '#F87171', color: '#1A0E0E', border: 'none',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  {bulkBusy ? <Spinner size={10} className="animate-spin" /> : null}
+                  confirmar
+                </button>
+                <button onClick={() => setBulkDeleteConfirm(false)} style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, background: 'none',
+                  border: 'none', color: 'var(--tx3)', cursor: 'pointer',
+                }}>cancelar</button>
+              </span>
+            )}
+
+            <div style={{ flex: 1 }} />
+
+            {/* Limpar seleção */}
+            <button onClick={clearSelection} style={{
+              background: 'none', border: 'none', color: 'var(--tx3)',
+              cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10,
+              display: 'flex', alignItems: 'center', gap: 3,
+            }}>
+              <X size={11} /> limpar
+            </button>
           </div>
         )}
-        </>) : (
-          <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-            <BookmarkSimple size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
-            <div>nenhuma referência encontrada</div>
+
+        {/* ── LAYOUT FICHÁRIO com etiquetas laterais estilo papel ── */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+
+          {/* ── Sidebar com estilo de fichário ── */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            padding: '6px 0',
+            minWidth: 'auto',
+            flexShrink: 0,
+          }}>
+            {folderTabs.map(f => {
+              const isActive = currentFolder === f.id;
+              const color = f.color || 'var(--acc)';
+              return (
+                <button
+                  key={f.id ?? '__all__'}
+                  onClick={() => { setCurrentFolder(f.id); setPage(0); setSelectedIds(new Set()); if (f.id === null) setActiveFilter('todos'); }}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 16px 6px 12px',
+                    background: isActive ? '#f5efe8' : '#fcf8f3',
+                    border: '1px solid #d6cdc0',
+                    borderRadius: '16px 4px 4px 16px',
+                    boxShadow: isActive ? '1px 2px 4px rgba(0,0,0,0.08)' : '0 1px 2px rgba(0,0,0,0.04)',
+                    color: isActive ? '#3d352c' : '#6b5f50',
+                    fontSize: 12,
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: isActive ? 600 : 400,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                    borderColor: isActive ? color : '#d6cdc0',
+                    borderLeft: `4px solid ${isActive ? color : '#d6cdc0'}`,
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = '#f0ebe4';
+                      e.currentTarget.style.borderColor = '#bfb5a8';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = '#fcf8f3';
+                      e.currentTarget.style.borderColor = '#d6cdc0';
+                    }
+                  }}
+                >
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: isActive ? color : '#cbc0b2',
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ letterSpacing: '0.02em' }}>{f.name}</span>
+                  <span style={{
+                    fontSize: 9,
+                    opacity: 0.6,
+                    marginLeft: 'auto',
+                    background: isActive ? '#e8dfd6' : '#eae3db',
+                    padding: '0 6px',
+                    borderRadius: 10,
+                    lineHeight: '16px',
+                    color: '#5f5344',
+                  }}>
+                    {f.count}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setNewFolderOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 16px 6px 12px',
+                borderRadius: '4px 16px 16px 4px',
+                border: '1px dashed #cbc0b2',
+                background: 'transparent',
+                color: '#8a7d6e',
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+                cursor: 'pointer',
+                marginTop: 6,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--acc)';
+                e.currentTarget.style.color = 'var(--acc)';
+                e.currentTarget.style.background = '#fcf8f3';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#cbc0b2';
+                e.currentTarget.style.color = '#8a7d6e';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <Plus size={10} /> nova etiqueta
+            </button>
           </div>
-        );
+
+          {/* ── Coluna da tabela ── */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+
+            {filtered.length > 0 ? (<>
+            <div style={{
+              border: '1px solid var(--brd)',
+              background: 'var(--bg1)',
+              overflowX: 'auto', overflowY: 'hidden',
+              borderRadius: '6px',
+            }}>
+              {/* Header */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: gridTemplate,
+                borderBottom: '1px solid var(--brd2)', padding: '0 8px', columnGap: 8,
+                background: 'var(--bg2)',
+              }}>
+                {activeCols.map((col) => {
+                  if (col.key === 'sel') return (
+                    <span key="sel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '7px 4px' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+                        onChange={toggleSelectAll}
+                        style={{ width: 13, height: 13, cursor: 'pointer', accentColor: 'var(--acc)' }}
+                        title="selecionar página"
+                      />
+                    </span>
+                  );
+                  return (
+                    <span key={col.key} style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9,
+                      color: sortBy === col.key ? 'var(--acc)' : 'var(--tx3)',
+                      letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600,
+                      cursor: ['num','actions','tags','relevance','progress','deadline'].includes(col.key) ? 'default' : 'pointer',
+                      userSelect: 'none', padding: '7px 4px',
+                      whiteSpace: 'nowrap', position: 'relative',
+                      display: 'flex', alignItems: 'center',
+                      justifyContent: col.key === 'num' ? 'center' : undefined,
+                    }}
+                      onClick={['num','actions','tags','relevance','progress','deadline'].includes(col.key) ? undefined : () => handleSort(col.key)}
+                    >
+                      {col.label}{!['num','actions','tags','relevance','progress','deadline'].includes(col.key) ? sortArrow(col.key) : ''}
+                      {col.key !== 'num' && col.key !== 'actions' && (
+                        <span
+                          onMouseDown={e => startResize(col.key, e)}
+                          style={{ position: 'absolute', right: -2, top: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 5 }}
+                        />
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* Rows */}
+              {paged.map((ref, idx) => {
+                const isSelected = selectedIds.has(ref.id);
+                return (
+                  <div
+                    key={ref.id}
+                    onClick={() => setDossieRef(ref)}
+                    draggable
+                    onDragStart={e => e.dataTransfer.setData('text/plain', ref.id)}
+                    style={{
+                      display: 'grid', gridTemplateColumns: gridTemplate,
+                      padding: '0 8px', cursor: 'pointer', columnGap: 8,
+                      borderBottom: '1px solid var(--brd)',
+                      transition: 'background 0.1s', minHeight: 36,
+                      background: isSelected ? 'var(--acc)08' : 'transparent',
+                      borderLeft: isSelected ? '2px solid var(--acc)' : '2px solid transparent',
+                    }}
+                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background='var(--bg2)'; }}
+                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background='transparent'; else e.currentTarget.style.background='var(--acc)08'; }}
+                  >
+                    {activeCols.map(col => (
+                      <span key={col.key} style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                        {renderCell(col.key, ref, idx)}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })}
+
+              {/* Footer */}
+              <div style={{
+                padding: '6px 12px', borderTop: '1px solid var(--brd)',
+                fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
+                display: 'flex', justifyContent: 'space-between', background: 'var(--bg2)',
+                borderRadius: '0 0 6px 6px',
+              }}>
+                <span>{filtered.length} ref{filtered.length !== 1 ? 's' : ''}</span>
+                {selectedIds.size > 0 && (
+                  <span style={{ color: 'var(--acc)' }}>{selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}</span>
+                )}
+                {totalPages > 1 && <span>pág. {safePage+1} de {totalPages}</span>}
+              </div>
+            </div>
+
+            {/* Paginação */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                <button disabled={safePage===0} onClick={() => setPage(p=>Math.max(0,p-1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage===0?'var(--tx3)':'var(--tx2)', padding: '3px 10px', cursor: safePage===0?'default':'pointer', opacity: safePage===0?0.4:1, fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 3 }}>←</button>
+                {Array.from({length: Math.min(7, totalPages)}, (_,i) => {
+                  const pg = totalPages <= 7 ? i : safePage < 4 ? i : safePage > totalPages-5 ? totalPages-7+i : safePage-3+i;
+                  return (
+                    <button key={pg} onClick={() => setPage(pg)} style={{
+                      background: pg===safePage?'var(--acc)':'var(--bg2)',
+                      color: pg===safePage?'var(--bg0)':'var(--tx3)',
+                      border: `1px solid ${pg===safePage?'var(--acc)':'var(--brd)'}`,
+                      padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 3,
+                      fontWeight: pg===safePage?700:400,
+                    }}>{pg+1}</button>
+                  );
+                })}
+                <button disabled={safePage>=totalPages-1} onClick={() => setPage(p=>Math.min(totalPages-1,p+1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage>=totalPages-1?'var(--tx3)':'var(--tx2)', padding: '3px 10px', cursor: safePage>=totalPages-1?'default':'pointer', opacity: safePage>=totalPages-1?0.4:1, fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 3 }}>→</button>
+              </div>
+            )}
+            </>) : (
+              <div style={{
+                border: '1px solid var(--brd)', borderRadius: '6px',
+                textAlign: 'center', padding: '48px 20px',
+                color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 12,
+                background: 'var(--bg1)',
+              }}>
+                <BookmarkSimple size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
+                <div>nenhuma referência encontrada</div>
+              </div>
+            )}
+          </div>
+        </div>
+        </>);
       })()}
 
-      {/* ── Dossiê (item view) ── */}
+      {/* ── Dossiê ── */}
       {dossieRef && (
         <ReferenceDossie
           reference={dossieRef}
@@ -735,6 +1347,7 @@ export function Acervo({ profileId }) {
       )}
       </>)}
 
+      {/* ── Toast ── */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
@@ -819,7 +1432,6 @@ function DeleteFolderModal({ folder, count, deleting, onCancel, onConfirm }) {
           <Trash size={14} color="#F87171" />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--tx2)' }}>excluir pasta</span>
         </div>
-
         <div style={{ padding: 20 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--tx)', lineHeight: 1.6 }}>
             Apagar <strong>{folder.name}/</strong> também apaga{' '}
@@ -831,7 +1443,6 @@ function DeleteFolderModal({ folder, count, deleting, onCancel, onConfirm }) {
             Essa ação não pode ser desfeita.
           </div>
         </div>
-
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 8,
           padding: '14px 20px', borderTop: '1px solid var(--brd)',
@@ -925,7 +1536,6 @@ function FolderCard({ folder, allRefs, view, onOpen, onEdit, onDelete, onShare, 
       ) : (
         <div style={{ height: 2, background: `linear-gradient(90deg,${fc},${fc}22)` }} />
       )}
-
       <div style={{ padding: '10px 12px 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
@@ -1004,409 +1614,6 @@ function FolderPicker({ folders, onPick }) {
   );
 }
 
-function ReferenceCard({ reference, profileId, view, folders, onShare, onAddToFolder, onEdit, onRead }) {
-  const dispatch = useDispatch();
-  const fileInputRef = useRef(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [hover, setHover] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [folderMenuOpen, setFolderMenuOpen] = useState(false);
-  const [citeMenuOpen, setCiteMenuOpen] = useState(false);
-  const [citeToast, setCiteToast] = useState('');
-
-  const typeLabels = {
-    paper_read: 'paper', my_article: 'meu art.',
-    dataset: 'dataset', book: 'livro', thesis: 'tese', note: 'nota',
-    post: 'artigo', thread: 'thread', news: 'notícia', cfp: 'CFP',
-  };
-
-  const TYPE_COLORS = {
-    paper_read: '#D4A030',
-    my_article: 'var(--acc)',
-    dataset: 'var(--green)',
-    book: '#F472B6',
-    thesis: '#60A5FA',
-    note: '#8A8680',
-    post: '#7B9EE0',
-    thread: '#A07BD4',
-    news: '#F87171',
-    cfp: '#4ADE80',
-  };
-
-  const toggleFavorite = async () => {
-    if (reference.id) await dispatch(toggleReferenceFavorite({ profileId, reference })).unwrap();
-  };
-
-  async function handleFile(file) {
-    if (!file) return;
-    setBusy(true);
-    try { await dispatch(attachReferenceFile({ profileId, reference, file })).unwrap(); }
-    finally { setBusy(false); }
-  }
-
-  async function handleDownload() {
-    if (!reference.filePath) return;
-    const url = await getReferenceFileUrl(reference.filePath);
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
-  async function handleRemoveFile(e) {
-    e.stopPropagation();
-    setBusy(true);
-    try { await dispatch(removeReferenceFile({ profileId, reference })).unwrap(); }
-    finally { setBusy(false); }
-  }
-
-  async function handleDelete(e) {
-    e.stopPropagation();
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    setBusy(true);
-    try { await dispatch(deleteReference({ profileId, reference })).unwrap(); }
-    finally { setBusy(false); setConfirmDelete(false); }
-  }
-
-  const FileMeta = () => {
-    if (!reference.filePath && !reference.url) return null;
-    const pillStyle = {
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'var(--bg3)', border: '1px solid var(--brd)',
-      borderRadius: 3, padding: '2px 6px',
-      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-      maxWidth: '100%', overflow: 'hidden', cursor: 'pointer', textDecoration: 'none',
-    };
-    if (reference.filePath) return (
-      <button onClick={e => { e.stopPropagation(); handleDownload(); }} title={reference.fileName} style={pillStyle}>
-        {fileIcon(reference.fileType, reference.fileName)}
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {formatFileType(reference.fileType, reference.fileName)} · {formatFileSize(reference.fileSize)}
-        </span>
-      </button>
-    );
-    return (
-      <a href={reference.url} target="_blank" rel="noopener noreferrer"
-        onClick={e => e.stopPropagation()} style={pillStyle}>
-        <LinkSimple size={11} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {hostnameOf(reference.url)}
-        </span>
-        <ArrowSquareOut size={10} style={{ flexShrink: 0 }} />
-      </a>
-    );
-  };
-
-  if (view === 'list') return (
-    <div
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('text/plain', reference.id); e.dataTransfer.effectAllowed = 'move'; }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setConfirmDelete(false); setFolderMenuOpen(false); }}
-      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]); }}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-        background: dragOver ? 'var(--acc-bg2)' : 'var(--bg1)',
-        border: `1px solid ${dragOver ? 'var(--acc)' : 'var(--brd)'}`,
-        borderRadius: 'var(--r-md)', transition: 'all 0.15s', position: 'relative',
-      }}
-    >
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-        color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.06em',
-        flexShrink: 0, width: 58,
-      }}>
-        {typeLabels[reference.type] || reference.type}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13,
-          color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {reference.title}
-        </div>
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)', marginTop: 1,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {reference.authors} {reference.year ? `· ${reference.year}` : ''}
-        </div>
-      </div>
-      <FileMeta />
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-        {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') && (
-          <button className="acervo-card-btn" onClick={e => { e.stopPropagation(); onRead?.(); }} title="ler PDF" style={{
-            ...cardBtnStyle, background: 'rgba(212,160,48,0.1)', borderColor: 'rgba(212,160,48,0.3)', color: 'var(--acc)',
-          }}>
-            <BookOpenText size={13} weight="fill" />
-          </button>
-        )}
-        <button onClick={toggleFavorite} title={reference.isFavorite ? 'desfavoritar' : 'favoritar'} className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
-          <Star size={13} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
-        </button>
-        <button onClick={e => { e.stopPropagation(); onEdit?.(); }} title="editar metadados" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
-          <PencilSimple size={13} />
-        </button>
-        {reference.filePath && (
-          <button onClick={e => { e.stopPropagation(); handleDownload(); }} title="baixar" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
-            <DownloadSimple size={13} />
-          </button>
-        )}
-        <button onClick={e => { e.stopPropagation(); onShare(); }} title="compartilhar link" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
-          <ShareNetwork size={13} />
-        </button>
-        <div style={{ position: 'relative' }}>
-          <button onClick={e => { e.stopPropagation(); setCiteMenuOpen(v => !v); }} title="copiar citação" className="acervo-card-btn" style={cardBtnStyle}>
-            <Quotes size={13} />
-          </button>
-          {citeMenuOpen && (
-            <div style={{
-              position: 'absolute', bottom: 30, right: 0, zIndex: 20,
-              background: 'var(--bg1)', border: '1px solid var(--brd2)',
-              borderRadius: 'var(--r-md)', padding: 4, minWidth: 100,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            }}>
-              {['abnt', 'apa', 'bibtex'].map(fmt => (
-                <button key={fmt} onClick={async (e) => {
-                  e.stopPropagation();
-                  await copyCitation(reference, fmt);
-                  setCiteMenuOpen(false);
-                  setCiteToast(fmt.toUpperCase());
-                  setTimeout(() => setCiteToast(''), 2000);
-                }} style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
-                  padding: '5px 8px', borderRadius: 'var(--r-sm)',
-                }}>{fmt.toUpperCase()}</button>
-              ))}
-            </div>
-          )}
-        </div>
-        {citeToast && (
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--acc)',
-            fontWeight: 600, padding: '2px 6px',
-          }}>{citeToast} copiado!</span>
-        )}
-        {folders.length > 0 && (
-          <div style={{ position: 'relative' }}>
-            <button onClick={e => { e.stopPropagation(); setFolderMenuOpen(v => !v); }} title="adicionar à pasta" className="acervo-card-btn" className="acervo-card-btn" style={cardBtnStyle}>
-              <Folder size={13} />
-            </button>
-            {folderMenuOpen && (
-              <FolderPicker folders={folders} onPick={fId => { onAddToFolder(reference.id, fId); setFolderMenuOpen(false); }} />
-            )}
-          </div>
-        )}
-        <button onClick={handleDelete} title={confirmDelete ? 'confirmar exclusão' : 'excluir'} style={{
-          ...cardBtnStyle,
-          color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.45)',
-          borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
-        }}>
-          {busy ? <Spinner size={13} className="animate-spin" /> : <Trash size={13} />}
-        </button>
-      </div>
-      <input ref={fileInputRef} type="file" onChange={e => handleFile(e.target.files?.[0])} style={{ display: 'none' }} />
-    </div>
-  );
-
-  // ── GRID (biblioteca digital — vertical) ────────────────────────
-  const typeColor = TYPE_COLORS[reference.type] || '#8A8680';
-
-  return (
-    <div
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('text/plain', reference.id); e.dataTransfer.effectAllowed = 'move'; }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => { setHover(false); setConfirmDelete(false); setFolderMenuOpen(false); }}
-      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]); }}
-      style={{
-        background: 'var(--bg2)',
-        border: `1px solid ${dragOver ? 'var(--acc)' : hover ? 'var(--brd2)' : 'var(--brd)'}`,
-        borderRadius: 'var(--r-lg)', cursor: 'default',
-        transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
-        boxShadow: hover ? '0 4px 20px rgba(0,0,0,0.3)' : 'none',
-        display: 'flex', flexDirection: 'column',
-      }}
-    >
-      {/* Cover — PDF thumbnail or type placeholder */}
-      <div style={{
-        height: 140, position: 'relative', overflow: 'hidden',
-        background: `linear-gradient(160deg, var(--bg3), var(--bg4))`,
-        borderBottom: '1px solid var(--brd)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {/* Color accent bar top */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: typeColor }} />
-
-        {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') ? (
-          <PdfThumbnail filePath={reference.filePath} width={200} height={140}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: 0 }} />
-        ) : (
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800,
-            color: typeColor, opacity: 0.1, textTransform: 'uppercase',
-            userSelect: 'none', letterSpacing: '-0.03em',
-          }}>
-            {(reference.type || 'ref').toUpperCase()}
-          </div>
-        )}
-
-        {/* Type badge */}
-        <span style={{
-          position: 'absolute', top: 10, left: 10,
-          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-          color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em',
-          padding: '2px 7px', borderRadius: 2,
-          background: `${typeColor}bb`, backdropFilter: 'blur(4px)',
-        }}>
-          {typeLabels[reference.type] || reference.type}
-        </span>
-
-        {/* Favorite corner */}
-        {reference.isFavorite && (
-          <Star size={13} weight="fill" color="var(--acc)"
-            style={{ position: 'absolute', top: 10, right: 10 }} />
-        )}
-
-        {/* File info */}
-        {reference.filePath && (
-          <span style={{
-            position: 'absolute', bottom: 6, right: 8,
-            display: 'flex', alignItems: 'center', gap: 3,
-            fontFamily: 'var(--font-mono)', fontSize: 9, color: '#fff',
-            background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 2,
-          }}>
-            {fileIcon(reference.fileType, reference.fileName)}
-            {reference.fileSize ? formatFileSize(reference.fileSize) : ''}
-          </span>
-        )}
-
-        {/* Read status */}
-        {reference.isRead && (
-          <span style={{
-            position: 'absolute', bottom: 6, left: 10,
-            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-            color: 'var(--green)', background: 'rgba(4,7,13,0.7)',
-            border: '1px solid rgba(74,222,128,0.3)', padding: '1px 6px', borderRadius: 2,
-          }}>✓ lido</span>
-        )}
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: '10px 12px 8px', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Title + inline actions */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 3 }}>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700,
-            fontSize: 13, lineHeight: 1.3, color: 'var(--tx)', flex: 1, minWidth: 0,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          }}>
-            {reference.title}
-          </div>
-          <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginTop: 1 }}>
-            {reference.filePath && (
-              <button onClick={e => { e.stopPropagation(); handleDownload(); }} className="acervo-card-btn" style={cardBtnStyle} title="baixar">
-                <DownloadSimple size={10} />
-              </button>
-            )}
-            <button onClick={toggleFavorite} className="acervo-card-btn" style={cardBtnStyle} title="favoritar">
-              <Star size={10} weight={reference.isFavorite ? 'fill' : 'regular'} color={reference.isFavorite ? 'var(--acc)' : 'var(--tx3)'} />
-            </button>
-            <button onClick={e => { e.stopPropagation(); onEdit?.(); }} className="acervo-card-btn" style={cardBtnStyle} title="editar">
-              <PencilSimple size={10} />
-            </button>
-            <button onClick={e => { e.stopPropagation(); onShare(); }} className="acervo-card-btn" style={cardBtnStyle} title="compartilhar">
-              <ShareNetwork size={10} />
-            </button>
-            <button onClick={handleDelete} className="acervo-card-btn" title={confirmDelete ? 'confirmar' : 'excluir'} style={{
-              ...cardBtnStyle,
-              color: confirmDelete ? '#F87171' : 'rgba(248,113,113,0.35)',
-              borderColor: confirmDelete ? 'rgba(248,113,113,0.3)' : 'var(--brd)',
-            }}>
-              {busy ? <Spinner size={10} className="animate-spin" /> : <Trash size={10} />}
-            </button>
-          </div>
-        </div>
-
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', marginBottom: 4,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {reference.authors || '—'} {reference.year ? `· ${reference.year}` : ''}
-        </div>
-
-        {(reference.rating > 0 || reference.qualis) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            {reference.rating > 0 && (
-              <div style={{ display: 'flex', gap: 1 }}>
-                {[1,2,3,4,5].map(n => (
-                  <Star key={n} size={10} weight={n <= reference.rating ? 'fill' : 'regular'}
-                    color={n <= reference.rating ? 'var(--acc)' : 'var(--tx3)'} style={{ opacity: n <= reference.rating ? 1 : 0.3 }} />
-                ))}
-              </div>
-            )}
-            {reference.qualis && (
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-                color: 'var(--acc)', border: '1px solid rgba(212,160,48,0.3)',
-                padding: '1px 5px', borderRadius: 2,
-              }}>{reference.qualis}</span>
-            )}
-          </div>
-        )}
-
-        {(reference.tags || []).length > 0 && (
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4 }}>
-            {reference.tags.slice(0, 3).map((tag) => (
-              <span key={tag} style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9,
-                padding: '1px 5px', borderRadius: 2,
-                background: 'var(--acc-bg)', color: 'var(--acc)',
-                border: '1px solid rgba(212,160,48,0.15)',
-              }}>{tag}</span>
-            ))}
-            {reference.tags.length > 3 && (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)' }}>+{reference.tags.length - 3}</span>
-            )}
-          </div>
-        )}
-
-        {reference.personalNote && (
-          <div style={{
-            fontSize: 11, color: 'var(--tx2)', fontFamily: 'var(--font-body)',
-            lineHeight: 1.4, marginBottom: 4,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden', fontStyle: 'italic', opacity: 0.7,
-          }}>
-            {reference.personalNote}
-          </div>
-        )}
-
-        <div style={{ flex: 1 }} />
-
-        {/* CTA */}
-        {reference.filePath && reference.fileName?.toLowerCase().endsWith('.pdf') && (
-          <button className="acervo-btn-ler" onClick={e => { e.stopPropagation(); onRead?.(); }} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, width: '100%',
-            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
-            color: '#fff', background: 'var(--acc)', border: 'none',
-            padding: '6px 0', borderRadius: 'var(--r-sm)', cursor: 'pointer',
-            marginTop: 6,marginBottom: 10, transition: 'all 0.12s',
-          }}>
-            <BookOpenText size={13} weight="fill" /> Ler
-          </button>
-        )}
-
-      </div>
-      <input ref={fileInputRef} type="file" onChange={e => handleFile(e.target.files?.[0])} style={{ display: 'none' }} />
-    </div>
-  );
-}
-
 function FolderModal({ folder, onClose, onSave, onDelete }) {
   const imageInputRef = useRef(null);
   const [name, setName] = useState(folder?.name || '');
@@ -1454,7 +1661,6 @@ function FolderModal({ folder, onClose, onSave, onDelete }) {
             <X size={16} />
           </button>
         </div>
-
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>imagem (opcional)</label>
@@ -1475,14 +1681,12 @@ function FolderModal({ folder, onClose, onSave, onDelete }) {
               }}>remover imagem</button>
             )}
           </div>
-
           <div>
             <label style={labelStyle}>nome</label>
             <input autoFocus value={name} onChange={e => setName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose(); }}
               placeholder="Ex: Referências SATD" style={inputStyle} />
           </div>
-
           <div>
             <label style={labelStyle}>cor da pasta</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1496,14 +1700,12 @@ function FolderModal({ folder, onClose, onSave, onDelete }) {
               ))}
             </div>
           </div>
-
           <div>
             <label style={labelStyle}>descrição (opcional)</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)}
               placeholder="do que se trata essa pasta..." rows={3}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
-
           <label style={{
             display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
             background: 'var(--bg2)', border: '1px solid var(--brd)', borderRadius: 'var(--r-md)', padding: '10px 12px',
@@ -1517,7 +1719,6 @@ function FolderModal({ folder, onClose, onSave, onDelete }) {
             </div>
           </label>
         </div>
-
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '14px 20px', borderTop: '1px solid var(--brd)', flexShrink: 0,
@@ -1639,17 +1840,13 @@ function EditReferenceModal({ profileId, reference, onClose }) {
               ))}
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
               <label style={labelStyle}>avaliação</label>
               <div style={{ display: 'flex', gap: 2 }}>
                 {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setRating(rating === n ? 0 : n)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  }}>
-                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'}
-                      color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
+                  <button key={n} onClick={() => setRating(rating === n ? 0 : n)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'} color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
                   </button>
                 ))}
               </div>
@@ -1683,7 +1880,6 @@ function EditReferenceModal({ profileId, reference, onClose }) {
               </div>
             </div>
           </div>
-
           <div><label style={labelStyle}>tags (separadas por vírgula)</label>
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Ex: SATD, MSR, technical-debt" style={inputStyle} /></div>
           <div><label style={labelStyle}>nota pessoal</label>
@@ -1808,7 +2004,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
             <X size={16} />
           </button>
         </div>
-
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <div style={{ display: 'flex', gap: 12, marginBottom: 6 }}>
@@ -1821,7 +2016,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
                 }}>{lbl}</button>
               ))}
             </div>
-
             {attachMode === 'file' ? (
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -1867,7 +2061,6 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
               </div>
             )}
           </div>
-
           <div><label style={labelStyle}>título</label>
             <input autoFocus value={title} onChange={e => { setTitle(e.target.value); setTitleTouched(true); }}
               placeholder="Ex: Self-Admitted Technical Debt in..." style={inputStyle} /></div>
@@ -1894,20 +2087,15 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
           </div>
           <div><label style={labelStyle}>tags (separadas por vírgula)</label>
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Ex: SATD, MSR" style={inputStyle} /></div>
-
           <div><label style={labelStyle}>DOI (opcional)</label>
             <input value={doi} onChange={e => setDoi(e.target.value)} placeholder="10.xxxx/xxxxx" style={inputStyle} /></div>
-
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
               <label style={labelStyle}>avaliação</label>
               <div style={{ display: 'flex', gap: 2 }}>
                 {[1,2,3,4,5].map(n => (
-                  <button key={n} type="button" onClick={() => setRating(rating === n ? 0 : n)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  }}>
-                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'}
-                      color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
+                  <button key={n} type="button" onClick={() => setRating(rating === n ? 0 : n)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                    <Star size={18} weight={n <= rating ? 'fill' : 'regular'} color={n <= rating ? 'var(--acc)' : 'var(--tx3)'} />
                   </button>
                 ))}
               </div>
@@ -1927,13 +2115,11 @@ function AddReferenceModal({ profileId, targetFolder, onAddToFolder, onClose }) 
               </div>
             </div>
           </div>
-
           <div><label style={labelStyle}>nota pessoal (opcional)</label>
             <textarea value={personalNote} onChange={e => setPersonalNote(e.target.value)}
               placeholder="Por que é relevante? Conexões com sua pesquisa..."
               rows={2} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} /></div>
         </div>
-
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 8,
           padding: '14px 20px', borderTop: '1px solid var(--brd)', flexShrink: 0,

@@ -1,7 +1,7 @@
 .side {
   width: var(--sidebar-w);
-  /* background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)), var(--bg1); */
-  background: linear-gradient(180deg, rgba(5, 1, 20, 0.516), transparent), var(--bg1);
+  /* background: linear-gradient(180deg, rgba(5, 1, 20, 0.516), transparent), var(--bg1); */
+  background: linear-gradient(180deg, rgba(5, 7, 21, 0.447), transparent), var(--bg1);
   background-color: color-mix(in srgb, var(--bg1) 62%, transparent);
   -webkit-backdrop-filter: blur(22px) saturate(150%);
   backdrop-filter: blur(22px) saturate(150%);
