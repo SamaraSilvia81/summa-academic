@@ -218,3 +218,8 @@ body.light::before {
 .acervo-card-btn:active {
   transform: scale(0.95);
 }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

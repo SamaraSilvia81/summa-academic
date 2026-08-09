@@ -1,0 +1,295 @@
+/* ── Fichário Dashboard ── painel de controle do acervo ── */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Seção genérica ── */
+.section {
+  border: 1px solid var(--brd);
+  background: var(--bg1);
+  position: relative;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--brd);
+}
+
+.sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sectionIcon {
+  color: var(--tx3);
+  flex-shrink: 0;
+}
+
+.sectionAction {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx3);
+  background: none;
+  border: 1px solid var(--brd);
+  padding: 3px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.sectionAction:hover {
+  border-color: var(--brd2);
+  color: var(--tx2);
+}
+
+/* ── HUD corners ── */
+.hudTL,
+.hudBR {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.hudTL {
+  top: 4px;
+  left: 4px;
+  border-top: 1.5px solid var(--acc);
+  border-left: 1.5px solid var(--acc);
+}
+
+.hudBR {
+  bottom: 4px;
+  right: 4px;
+  border-bottom: 1.5px solid var(--acc);
+  border-right: 1.5px solid var(--acc);
+}
+
+/* ── Folder rows ── */
+.folderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--brd);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.folderRow:last-child {
+  border-bottom: none;
+}
+
+.folderRow:hover {
+  background: var(--bg2);
+}
+
+.folderEar {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.folderCount {
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+.folderMid {
+  flex: 1;
+  min-width: 0;
+}
+
+.folderPreview {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--tx2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folderSub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx3);
+  margin-top: 1px;
+}
+
+.folderPct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tx3);
+  flex-shrink: 0;
+}
+
+.folderBar {
+  width: 40px;
+  height: 2px;
+  background: var(--bg3);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.folderBarFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
+.folderActions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.folderRow:hover .folderActions {
+  opacity: 1;
+}
+
+.folderActionBtn {
+  padding: 3px 5px;
+  border-radius: var(--r-sm);
+  background: var(--bg3);
+  border: 1px solid var(--brd);
+  color: var(--tx3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.12s;
+}
+
+.folderActionBtn:hover {
+  background: var(--bg4);
+  color: var(--tx2);
+  border-color: var(--brd2);
+}
+
+.folderActionBtnDanger:hover {
+  background: rgba(248,113,113,0.08);
+  color: #F87171;
+  border-color: rgba(248,113,113,0.25);
+}
+
+.inboxBadge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  background: rgba(212,160,48,0.1);
+  color: var(--acc);
+  margin-left: 2px;
+}
+
+/* ── Bottom grid: recentes + favoritos + áreas ── */
+.bottomGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .bottomGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Side items (recentes, favoritos) ── */
+.sideItem {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--brd);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.sideItem:last-child {
+  border-bottom: none;
+}
+
+.sideItem:hover {
+  background: var(--bg2);
+}
+
+.sideItemTitle {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--tx);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sideItemMeta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--tx3);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sideItemDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Tags ── */
+.tagGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+}
+
+.tagChip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  border: 1px solid var(--brd2);
+  color: var(--tx2);
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tagChip:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+
+.tagCount {
+  font-size: 10px;
+  color: var(--tx3);
+}

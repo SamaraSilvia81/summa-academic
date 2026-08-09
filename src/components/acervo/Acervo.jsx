@@ -24,6 +24,8 @@ import { getReferenceFileUrl } from '../../lib/storage';
 import { copyCitation, exportBibTeX, exportRIS } from '../../lib/citations';
 import { ReferenceFolderRepo } from '../../services/repositories';
 import { PdfThumbnail } from './PdfThumbnail';
+import { Fichario } from './Fichario';
+import { ReferenceDossie } from './ReferenceDossie';
 
 const FILTERS = ['todos', 'papers', 'livros', 'artigos', 'meus artigos', 'datasets', 'notas', 'favoritos'];
 
@@ -162,16 +164,22 @@ export function Acervo({ profileId }) {
   } = useReferenceFolders(profileId);
 
   // ── Derivados das rotas ──
+  const [virtualFolder, setVirtualFolder] = useState(null);
   const activeTab = folderId ? 'referencias' : (tab || 'referencias');
-  const currentFolder = folderId || null;
+  const currentFolder = virtualFolder || folderId || null;
   const setActiveTab = (t) => navigate(`/acervo/${t}`);
-  const setCurrentFolder = (id) => id ? navigate(`/acervo/pasta/${id}`) : navigate('/acervo/referencias');
+  const setCurrentFolder = (id) => {
+    if (!id) { setVirtualFolder(null); navigate('/acervo/referencias'); }
+    else if (id.startsWith('__')) { setVirtualFolder(id); }
+    else { setVirtualFolder(null); navigate(`/acervo/pasta/${id}`); }
+  };
 
   const [readingRef, setReadingRef] = useState(null);
   const [activeFilter, setActiveFilter] = useState('todos');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState('recent');
+  const [sortDir, setSortDir] = useState('desc');
   const [filterYear, setFilterYear] = useState('todos');
   const [filterHasFile, setFilterHasFile] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -183,12 +191,20 @@ export function Acervo({ profileId }) {
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null);
   const [deletingFolder, setDeletingFolder] = useState(false);
   const [toast, setToast] = useState('');
+  const [dossieRef, setDossieRef] = useState(null);
+  const [page, setPage] = useState(0);
+  const defaultColWidths = [28, 340, 140, 50, 68, 52, 80, 28];
+  const [colWidths, setColWidths] = useState(defaultColWidths);
+  const resizingCol = useRef(null);
+  const PER_PAGE = 20;
 
-  const currentFolderObj = folders.find(f => f.id === currentFolder) || null;
+  const isInbox = currentFolder === '__inbox__';
+  const currentFolderObj = isInbox ? null : (folders.find(f => f.id === currentFolder) || null);
 
   const refsInAnyFolder = new Set(folders.flatMap(f => f.refIds || []));
+  const inboxCount = (references || []).filter(r => !refsInAnyFolder.has(r.id)).length;
 
-  const folderRefIds = currentFolderObj ? new Set(currentFolderObj.refIds || []) : null;
+  const folderRefIds = isInbox ? null : (currentFolderObj ? new Set(currentFolderObj.refIds || []) : null);
 
   const availableYears = Array.from(
     new Set((references || []).map((r) => r.year).filter(Boolean))
@@ -198,16 +214,52 @@ export function Acervo({ profileId }) {
 
   function clearFilters() {
     setSortBy('recent');
+    setSortDir('desc');
     setFilterYear('todos');
     setFilterHasFile(false);
+    setPage(0);
+  }
+
+  function handleSort(col) {
+    if (sortBy === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir(col === 'title' || col === 'author' ? 'asc' : 'desc');
+    }
+    setPage(0);
+  }
+
+  function startResize(colIdx, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = colWidths[colIdx];
+    resizingCol.current = colIdx;
+    const onMove = (ev) => {
+      const delta = ev.clientX - startX;
+      setColWidths(prev => {
+        const next = [...prev];
+        next[colIdx] = Math.max(28, startW + delta);
+        return next;
+      });
+    };
+    const onUp = () => {
+      resizingCol.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 
   const filtered = (references || []).filter((ref) => {
-    if (folderRefIds !== null) {
-      return folderRefIds.has(ref.id);
-    } else {
-      return !refsInAnyFolder.has(ref.id);
-    }
+    if (!currentFolder) return true;
+    if (currentFolder === '__read__') return ref.isRead;
+    if (currentFolder === '__unread__') return !ref.isRead;
+    if (isInbox) return !refsInAnyFolder.has(ref.id); // inbox: orphans
+    if (folderRefIds) return folderRefIds.has(ref.id); // specific folder
+    return true;
   }).filter((ref) => {
     if (activeFilter === 'papers') return ref.type === 'paper_read';
     if (activeFilter === 'livros') return ref.type === 'book';
@@ -230,12 +282,17 @@ export function Acervo({ profileId }) {
     if (!filterHasFile) return true;
     return !!ref.filePath;
   }).sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    if (sortBy === 'title') return dir * (a.title || '').localeCompare(b.title || '');
+    if (sortBy === 'author') return dir * (a.authors || '').localeCompare(b.authors || '');
+    if (sortBy === 'year') return dir * ((a.year || 0) - (b.year || 0));
+    if (sortBy === 'type') return dir * (a.type || '').localeCompare(b.type || '');
+    if (sortBy === 'status') return dir * ((a.isRead ? 1 : 0) - (b.isRead ? 1 : 0));
     if (sortBy === 'az') return (a.title || '').localeCompare(b.title || '');
-    if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 
-  const isEmpty = filtered.length === 0 && !(!currentFolder && folders.length > 0);
+  const isEmpty = filtered.length === 0;
 
   function showToast(msg) {
     setToast(msg);
@@ -377,106 +434,106 @@ export function Acervo({ profileId }) {
 
       {activeTab === 'referencias' && (<>
 
-      {currentFolderObj && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 12px',
-          fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)',
-        }}>
-          <button onClick={() => setCurrentFolder(null)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tx3)',
-            display: 'flex', alignItems: 'center', gap: 4, padding: 0,
-          }}>
-            <CaretLeft size={12} /> acervo
-          </button>
-          <span>/</span>
-          <span style={{ color: currentFolderObj.color || 'var(--acc)', fontWeight: 600 }}>
-            {currentFolderObj.name}
-          </span>
-        </div>
-      )}
-
+      {/* ── Pastas ── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        marginBottom: filtersOpen ? 10 : 14, flexWrap: 'wrap',
+        display: 'flex', gap: 6, marginBottom: 8, alignItems: 'stretch', flexWrap: 'wrap',
       }}>
-        <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+        {[
+          { id: null, name: 'Todas', icon: '◉', color: 'var(--acc)', count: (references || []).length },
+          { id: '__inbox__', name: 'Inbox', icon: '◌', color: '#8A8680', count: inboxCount },
+          { id: '__read__', name: 'Lidos', icon: '✓', color: '#4ADE80', count: (references || []).filter(r => r.isRead).length },
+          { id: '__unread__', name: 'Não lidos', icon: '○', color: 'var(--tx3)', count: (references || []).filter(r => !r.isRead).length },
+          ...folders.map(f => ({ id: f.id, name: f.name, icon: '▪', color: f.color || 'var(--acc)', count: (f.refIds || []).length })),
+        ].map(f => {
+          const isActive = currentFolder === f.id;
+          return (
+            <button
+              key={f.id || '__all__'}
+              onClick={() => { setCurrentFolder(f.id); setPage(0); if (f.id === null) setActiveFilter('todos'); }}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                padding: '8px 14px', cursor: 'pointer', minWidth: 80,
+                border: isActive ? '1px solid ' + f.color : '1px solid var(--brd)',
+                background: isActive ? f.color + '10' : 'var(--bg1)',
+                transition: 'all 0.12s',
+              }}
+            >
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9, color: isActive ? f.color : 'var(--tx3)',
+                letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <span style={{ fontSize: 8 }}>{f.icon}</span> {f.name}
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
+                color: isActive ? f.color : 'var(--tx2)', marginTop: 2,
+              }}>
+                {f.count}
+              </span>
+            </button>
+          );
+        })}
+        <button onClick={() => setNewFolderOpen(true)} title="nova pasta" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--bg1)', border: '1px dashed var(--brd)',
+          padding: '8px 14px', cursor: 'pointer', color: 'var(--tx3)', minWidth: 50,
+        }}>
+          <FolderPlus size={14} />
+        </button>
+      </div>
+
+      {/* ── Barra de ações ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+      }}>
+        <div style={{ display: 'flex', gap: 3, flex: 1, flexWrap: 'wrap' }}>
           {FILTERS.map((f) => (
-            <button key={f} onClick={() => setActiveFilter(f)} style={{
-              fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
-              padding: '4px 12px', cursor: 'pointer',
-              borderRadius: 'var(--r-sm)',
-              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid var(--brd2)',
+            <button key={f} onClick={() => { setActiveFilter(f); setPage(0); }} style={{
+              fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 500,
+              padding: '3px 8px', cursor: 'pointer',
+              border: activeFilter === f ? '1px solid var(--acc)' : '1px solid var(--brd)',
               background: activeFilter === f ? 'var(--acc-bg)' : 'transparent',
               color: activeFilter === f ? 'var(--acc)' : 'var(--tx3)',
-              transition: 'all 0.18s',
+              transition: 'all 0.12s', textTransform: 'uppercase', letterSpacing: '0.04em',
             }}>
               {f}
             </button>
           ))}
         </div>
-
-        <button onClick={() => setFiltersOpen(v => !v)} title="filtros" style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          background: filtersOpen ? 'var(--bg4)' : (hasActiveFilters ? 'var(--acc-bg)' : 'var(--bg2)'),
-          border: `1px solid ${filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--brd)'}`,
-          borderRadius: 'var(--r-md)', padding: '6px 9px', cursor: 'pointer',
+        <button onClick={() => setFiltersOpen(v => !v)} style={{
+          display: 'flex', alignItems: 'center', gap: 3,
+          background: filtersOpen || hasActiveFilters ? 'var(--acc-bg)' : 'transparent',
+          border: '1px solid ' + (filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--brd)'),
+          padding: '3px 8px', cursor: 'pointer',
           color: filtersOpen || hasActiveFilters ? 'var(--acc)' : 'var(--tx3)',
+          fontFamily: 'var(--font-mono)', fontSize: 9,
         }}>
-          <Funnel size={14} weight={hasActiveFilters ? 'fill' : 'regular'} />
+          <Funnel size={10} weight={hasActiveFilters ? 'fill' : 'regular'} /> filtros
         </button>
-
-        <div style={{
-          display: 'flex', background: 'var(--bg2)', border: '1px solid var(--brd)',
-          borderRadius: 'var(--r-md)', overflow: 'hidden',
-        }}>
-          {[['grid', <SquaresFour size={14} />], ['list', <Rows size={14} />]].map(([v, icon]) => (
-            <button key={v} onClick={() => setView(v)} style={{
-              padding: '6px 9px', border: 'none', cursor: 'pointer',
-              background: view === v ? 'var(--bg4)' : 'transparent',
-              color: view === v ? 'var(--tx)' : 'var(--tx3)',
-              display: 'flex', alignItems: 'center', transition: 'all 0.13s',
-            }}>
-              {icon}
-            </button>
-          ))}
-        </div>
-
-        {!currentFolder && (
-          <button onClick={() => setNewFolderOpen(true)} title="nova pasta" style={{
-            display: 'flex', alignItems: 'center',
-            background: 'var(--bg2)', border: '1px solid var(--brd)',
-            borderRadius: 'var(--r-md)', padding: '6px 9px', cursor: 'pointer',
-            color: 'var(--tx3)',
-          }}>
-            <FolderPlus size={15} />
-          </button>
-        )}
-
         <button onClick={() => setAddOpen(true)} style={{
-          display: 'flex', alignItems: 'center', gap: 5,
+          display: 'flex', alignItems: 'center', gap: 4,
           background: 'var(--acc)', color: 'var(--bg0)', border: 'none',
-          borderRadius: 'var(--r-md)', padding: '0 13px', cursor: 'pointer',
-          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, height: 33,
-          letterSpacing: '0.03em',
+          padding: '4px 12px', cursor: 'pointer',
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+          textTransform: 'uppercase',
         }}>
-          <Plus size={14} weight="bold" /> ADICIONAR
+          <Plus size={10} weight="bold" /> adicionar
         </button>
-
-        {/* Exportar referências */}
         <div style={{ position: 'relative' }}>
           <button onClick={() => setExportOpen(o => !o)} style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            background: 'var(--bg2)', color: 'var(--tx2)', border: '1px solid var(--brd)',
-            borderRadius: 'var(--r-md)', padding: '0 10px', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 11, height: 33,
+            display: 'flex', alignItems: 'center', gap: 3,
+            background: 'transparent', color: 'var(--tx3)', border: '1px solid var(--brd)',
+            padding: '4px 10px', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: 9,
           }}>
-            <Export size={13} /> Exportar
+            <Export size={10} /> exportar
           </button>
           {exportOpen && (
             <div style={{
-              position: 'absolute', top: 38, right: 0, zIndex: 20,
+              position: 'absolute', top: 28, right: 0, zIndex: 20,
               background: 'var(--bg1)', border: '1px solid var(--brd2)',
-              borderRadius: 'var(--r-md)', padding: 6, minWidth: 140,
+              borderRadius: 'var(--r-md)', padding: 4, minWidth: 120,
               boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             }}>
               {[
@@ -486,8 +543,8 @@ export function Acervo({ profileId }) {
                 <button key={label} onClick={fn} style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx2)',
-                  padding: '6px 10px', borderRadius: 'var(--r-sm)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx2)',
+                  padding: '5px 8px',
                 }}>{label}</button>
               ))}
             </div>
@@ -497,109 +554,186 @@ export function Acervo({ profileId }) {
 
       {filtersOpen && (
         <div style={{
-          background: 'var(--bg1)', border: '1px solid var(--brd2)',
-          borderRadius: 'var(--r-lg)', padding: '14px 16px', marginBottom: 14,
-          display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 20,
+          background: 'var(--bg1)', border: '1px solid var(--brd)',
+          padding: '8px 12px', marginBottom: 8,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14,
         }}>
           <div>
-            <label style={labelStyle}>ordenar por</label>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <label style={labelStyle}>ordenar</label>
+            <div style={{ display: 'flex', gap: 3 }}>
               {SORT_OPTIONS.map(opt => (
                 <button key={opt.value} onClick={() => setSortBy(opt.value)} style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
-                  padding: '4px 10px', cursor: 'pointer', borderRadius: 'var(--r-sm)',
-                  border: sortBy === opt.value ? '1px solid var(--acc)' : '1px solid var(--brd2)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 8px', cursor: 'pointer',
+                  border: sortBy === opt.value ? '1px solid var(--acc)' : '1px solid var(--brd)',
                   background: sortBy === opt.value ? 'var(--acc-bg)' : 'transparent',
                   color: sortBy === opt.value ? 'var(--acc)' : 'var(--tx3)',
-                }}>
-                  {opt.label}
-                </button>
+                }}>{opt.label}</button>
               ))}
             </div>
           </div>
-
           <div>
             <label style={labelStyle}>ano</label>
             <select value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{
-              background: 'var(--bg2)', border: '1px solid var(--brd2)', borderRadius: 'var(--r-sm)',
-              padding: '5px 8px', color: 'var(--tx)', fontFamily: 'var(--font-mono)', fontSize: 12,
+              background: 'var(--bg2)', border: '1px solid var(--brd2)',
+              padding: '3px 6px', color: 'var(--tx)', fontFamily: 'var(--font-mono)', fontSize: 10,
               outline: 'none', cursor: 'pointer',
             }}>
               <option value="todos">todos</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input type="checkbox" checked={filterHasFile} onChange={e => setFilterHasFile(e.target.checked)} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx2)' }}>c/ arquivo</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx2)' }}>c/ arquivo</span>
           </label>
-
           {hasActiveFilters && (
             <button onClick={clearFilters} style={{
               marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--tx3)',
+              fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
               textDecoration: 'underline', padding: 0,
-            }}>
-              limpar
-            </button>
+            }}>limpar</button>
           )}
         </div>
       )}
 
-      {!currentFolder && folders.length > 0 && (
-        <div style={{
-          display: view === 'grid' ? 'grid' : 'flex',
-          gridTemplateColumns: view === 'grid' ? 'repeat(auto-fill, minmax(200px, 1fr))' : undefined,
-          flexDirection: view === 'list' ? 'column' : undefined,
-          gap: 8, marginBottom: 16,
-        }}>
-          {folders.map(folder => (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              allRefs={references || []}
-              view={view}
-              onOpen={() => setCurrentFolder(folder.id)}
-              onEdit={() => setEditFolderOpen(folder.id)}
-              onDelete={() => setConfirmDeleteFolder(folder)}
-              onShare={() => shareFolder(folder)}
-              onDropRef={addRefToFolder}
-            />
-          ))}
-        </div>
-      )}
+      {/* ── Tabela ── */}
+      {(() => {
+        const totalPages = Math.ceil(filtered.length / PER_PAGE);
+        const safePage = Math.min(page, Math.max(0, totalPages - 1));
+        const paged = filtered.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
+        const sortArrow = (col) => sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+        const thS = (col) => ({
+          fontFamily: 'var(--font-mono)', fontSize: 9, color: sortBy === col ? 'var(--acc)' : 'var(--tx3)',
+          letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600,
+          cursor: 'pointer', userSelect: 'none', padding: '7px 4px',
+          transition: 'color 0.12s', whiteSpace: 'nowrap',
+        });
+        const TC = {
+          paper_read:'#D4A030',my_article:'#D4A030',dataset:'#4ADE80',
+          book:'#F472B6',thesis:'#60A5FA',note:'#8A8680',
+          post:'#7B9EE0',thread:'#A07BD4',news:'#F87171',cfp:'#4ADE80',
+        };
+        const TL = {
+          paper_read:'paper',my_article:'meu art.',dataset:'dataset',
+          book:'livro',thesis:'tese',note:'nota',
+          post:'artigo',thread:'thread',news:'notícia',cfp:'CFP',
+        };
+        const TF = {
+          paper_read:'papers',book:'livros',post:'artigos',thread:'artigos',
+          news:'artigos',my_article:'meus artigos',dataset:'datasets',note:'notas',
+        };
+        const cols = colWidths.map(w => w + 'px').join(' ');
 
-      {filtered.length > 0 ? (
-        <div style={{
-          display: view === 'grid' ? 'grid' : 'flex',
-          gridTemplateColumns: view === 'grid' ? 'repeat(auto-fill, minmax(280px, 1fr))' : undefined,
-          flexDirection: view === 'list' ? 'column' : undefined,
-          gap: view === 'grid' ? 12 : 6,
-        }}>
-          {filtered.map((ref) => (
-            <ReferenceCard
-              key={ref.id}
-              reference={ref}
-              profileId={profileId}
-              view={view}
-              folders={folders}
-              onShare={() => shareRef(ref)}
-              onAddToFolder={addRefToFolder}
-              onEdit={() => setEditRefOpen(ref)}
-              onRead={() => { setReadingRef(ref); setActiveTab('leitura'); }}
-            />
-          ))}
+        return filtered.length > 0 ? (<>
+        <div style={{ border: '1px solid var(--brd)', background: 'var(--bg1)', overflowX: 'auto', overflowY: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--brd2)', padding: '0 8px', columnGap: 8 }}>
+            {[
+              { key: '', label: '#', sort: false },
+              { key: 'title', label: 'título' },
+              { key: 'author', label: 'autor' },
+              { key: 'year', label: 'ano' },
+              { key: 'type', label: 'tipo' },
+              { key: 'status', label: 'status' },
+              { key: '', label: 'fonte', sort: false },
+              { key: '', label: '', sort: false },
+            ].map((col, i) => (
+              <span key={i} style={{
+                ...thS(col.key),
+                cursor: col.sort === false ? 'default' : 'pointer',
+                position: 'relative', display: 'flex', alignItems: 'center',
+                textAlign: i === 0 ? 'center' : undefined,
+                justifyContent: i === 0 ? 'center' : undefined,
+              }}
+                onClick={col.sort !== false ? () => handleSort(col.key) : undefined}
+              >
+                {col.label}{col.sort !== false ? sortArrow(col.key) : ''}
+                {i > 0 && i < 7 && (
+                  <span
+                    onMouseDown={e => startResize(i, e)}
+                    style={{
+                      position: 'absolute', right: -2, top: 0, bottom: 0, width: 5,
+                      cursor: 'col-resize', zIndex: 5,
+                    }}
+                  />
+                )}
+              </span>
+            ))}
+          </div>
+
+          {paged.map((ref, idx) => {
+            const tc = TC[ref.type] || '#8A8680';
+            const tl = TL[ref.type] || ref.type;
+            const rowNum = safePage * PER_PAGE + idx + 1;
+            const srcName = ref.source || ref.venue || '';
+
+            return (
+              <div
+                key={ref.id}
+                onClick={() => setDossieRef(ref)}
+                draggable
+                onDragStart={e => e.dataTransfer.setData('text/plain', ref.id)}
+                style={{
+                  display: 'grid', gridTemplateColumns: cols,
+                  padding: '0 8px', cursor: 'pointer', columnGap: 8,
+                  borderBottom: '1px solid var(--brd)',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>{rowNum}</span>
+                <div style={{ padding: '6px 4px', minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--tx)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{ref.title}</div>
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{ref.authors || '—'}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.year || '—'}</span>
+                <span onClick={e => { e.stopPropagation(); const fk = TF[ref.type]; if (fk) { setActiveFilter(fk); setPage(0); } }} title={'filtrar: ' + tl} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: tc, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                  <span style={{ width: 4, height: 4, background: tc, flexShrink: 0 }} />{tl}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: ref.isRead ? '#4ADE80' : 'var(--tx3)', display: 'flex', alignItems: 'center' }}>{ref.isRead ? 'lido' : 'novo'}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{srcName || '—'}</span>
+                <span style={{ display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
+                  {ref.isFavorite && <Star size={9} weight="fill" color="#D4A030" />}
+                  {ref.filePath && <FilePdf size={9} color="var(--tx3)" />}
+                </span>
+              </div>
+            );
+          })}
+
+          <div style={{ padding: '6px 8px', borderTop: '1px solid var(--brd)', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', display: 'flex', justifyContent: 'space-between' }}>
+            <span>{filtered.length} ref{filtered.length !== 1 ? 's' : ''}</span>
+            {totalPages > 1 && <span>pág. {safePage + 1} de {totalPages}</span>}
+          </div>
         </div>
-      ) : isEmpty ? (
-        <div style={{
-          textAlign: 'center', padding: '48px 20px',
-          color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 14,
-        }}>
-          <BookmarkSimple size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
-          <div>{currentFolder ? 'pasta vazia — arraste referências aqui' : 'nenhum item encontrado'}</div>
-        </div>
-      ) : null}
+
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+            <button disabled={safePage === 0} onClick={() => setPage(p => Math.max(0, p - 1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage === 0 ? 'var(--tx3)' : 'var(--tx2)', padding: '3px 10px', cursor: safePage === 0 ? 'default' : 'pointer', opacity: safePage === 0 ? 0.4 : 1, fontFamily: 'var(--font-mono)', fontSize: 10 }}>anterior</button>
+            <span style={{ color: 'var(--tx3)' }}>{safePage + 1} / {totalPages}</span>
+            <button disabled={safePage >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} style={{ background: 'var(--bg2)', border: '1px solid var(--brd)', color: safePage >= totalPages - 1 ? 'var(--tx3)' : 'var(--tx2)', padding: '3px 10px', cursor: safePage >= totalPages - 1 ? 'default' : 'pointer', opacity: safePage >= totalPages - 1 ? 0.4 : 1, fontFamily: 'var(--font-mono)', fontSize: 10 }}>próxima</button>
+          </div>
+        )}
+        </>) : (
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+            <BookmarkSimple size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
+            <div>nenhuma referência encontrada</div>
+          </div>
+        );
+      })()}
+
+      {/* ── Dossiê (item view) ── */}
+      {dossieRef && (
+        <ReferenceDossie
+          reference={dossieRef}
+          profileId={profileId}
+          folders={folders}
+          onClose={() => setDossieRef(null)}
+          onRead={() => { setReadingRef(dossieRef); setActiveTab('leitura'); setDossieRef(null); }}
+          onEdit={() => { setEditRefOpen(dossieRef); setDossieRef(null); }}
+          onAddToFolder={addRefToFolder}
+        />
+      )}
+      </>)}
 
       {toast && (
         <div style={{
@@ -662,7 +796,6 @@ export function Acervo({ profileId }) {
         />
       )}
 
-      </>)}
     </div>
   );
 }
