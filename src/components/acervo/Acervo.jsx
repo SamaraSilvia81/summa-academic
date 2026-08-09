@@ -24,6 +24,8 @@ import {
 import { getReferenceFileUrl } from '../../lib/storage';
 import { copyCitation, exportBibTeX, exportRIS } from '../../lib/citations';
 import { ReferenceFolderRepo } from '../../services/repositories';
+import { useSettings } from '../../hooks/useData';
+import { saveSettings } from '../../store/slices/dataSlice';
 import { PdfThumbnail } from './PdfThumbnail';
 import { Fichario } from './Fichario';
 import { ReferenceDossie } from './ReferenceDossie';
@@ -159,6 +161,7 @@ export function Acervo({ profileId }) {
   const navigate = useNavigate();
   const { tab, folderId } = useParams();
   const references = useReferences(profileId);
+  const settings = useSettings(profileId);
   const {
     folders, createFolder, updateFolder,
     deleteFolder, addRefToFolder,
@@ -225,9 +228,24 @@ export function Acervo({ profileId }) {
     { key: 'venue',    label: 'Venue',        defaultOn: false, width: 100 },
     { key: 'actions',  label: '',             defaultOn: true,  width: 28 },
   ];
-  const [visibleCols, setVisibleCols] = useState(() =>
-    Object.fromEntries(ALL_COLS.map(c => [c.key, c.defaultOn]))
+  const _defaultCols = Object.fromEntries(ALL_COLS.map(c => [c.key, c.defaultOn]));
+  const [visibleCols, _setVisibleCols] = useState(() =>
+    settings?.acervoColumns ? { ..._defaultCols, ...settings.acervoColumns } : _defaultCols
   );
+  // Sync from Supabase when settings load
+  useEffect(() => {
+    if (settings?.acervoColumns) {
+      _setVisibleCols(prev => ({ ..._defaultCols, ...settings.acervoColumns }));
+    }
+  }, [settings?.acervoColumns]);
+  // Wrapper that saves to Supabase automatically
+  const setVisibleCols = useCallback((updater) => {
+    _setVisibleCols(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (profileId) dispatch(saveSettings({ profileId, data: { acervoColumns: next } }));
+      return next;
+    });
+  }, [dispatch, profileId]);
   const [colWidths, setColWidths] = useState(() =>
     Object.fromEntries(ALL_COLS.map(c => [c.key, c.width]))
   );
@@ -1094,121 +1112,102 @@ export function Acervo({ profileId }) {
           </div>
         )}
 
-        {/* ── LAYOUT FICHÁRIO com etiquetas laterais estilo papel ── */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        {/* ── FICHÁRIO — divisores físicos estilo CYPHER ── */}
+        <div style={{ position: 'relative' }}>
 
-          {/* ── Sidebar com estilo de fichário ── */}
+          {/* ── Etiquetas de fichário (divisores staggered) ── */}
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            padding: '6px 0',
-            minWidth: 'auto',
-            flexShrink: 0,
+            display: 'flex', alignItems: 'flex-end', gap: 2,
+            paddingLeft: 0, overflowX: 'auto', overflowY: 'visible',
+            position: 'relative', zIndex: 3,
           }}>
-            {folderTabs.map(f => {
+            {folderTabs.map((f, i) => {
               const isActive = currentFolder === f.id;
               const color = f.color || 'var(--acc)';
+              const isOdd = i % 2 === 1;
               return (
                 <button
                   key={f.id ?? '__all__'}
                   onClick={() => { setCurrentFolder(f.id); setPage(0); setSelectedIds(new Set()); if (f.id === null) setActiveFilter('todos'); }}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 16px 6px 12px',
-                    background: isActive ? '#f5efe8' : '#fcf8f3',
-                    border: '1px solid #d6cdc0',
-                    borderRadius: '16px 4px 4px 16px',
-                    boxShadow: isActive ? '1px 2px 4px rgba(0,0,0,0.08)' : '0 1px 2px rgba(0,0,0,0.04)',
-                    color: isActive ? '#3d352c' : '#6b5f50',
-                    fontSize: 12,
-                    fontFamily: 'var(--font-mono)',
+                  onDragOver={f.id && !String(f.id).startsWith('__') ? (e) => { e.preventDefault(); e.currentTarget.style.background = 'var(--bg4)'; } : undefined}
+                  onDragLeave={f.id && !String(f.id).startsWith('__') ? (e) => { e.currentTarget.style.background = isActive ? 'var(--bg1)' : 'var(--bg3)'; } : undefined}
+                  onDrop={f.id && !String(f.id).startsWith('__') ? (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.background = isActive ? 'var(--bg1)' : 'var(--bg3)';
+                    const refId = e.dataTransfer.getData('text/plain');
+                    if (refId) addRefToFolder(refId, f.id);
+                  } : undefined}
+                  style={{
+                    position: 'relative',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: isActive ? '7px 16px 8px' : '5px 14px 6px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
                     fontWeight: isActive ? 600 : 400,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    color: isActive ? 'var(--tx)' : 'var(--tx3)',
+                    background: isActive ? 'var(--bg1)' : 'var(--bg3)',
+                    border: `1px solid ${isActive ? 'var(--brd2)' : 'var(--brd)'}`,
+                    borderBottom: isActive ? '1px solid var(--bg1)' : '1px solid var(--brd)',
+                    borderRadius: 0,
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.12s',
                     whiteSpace: 'nowrap',
-                    borderColor: isActive ? color : '#d6cdc0',
-                    borderLeft: `4px solid ${isActive ? color : '#d6cdc0'}`,
-                  }}
-                  onMouseEnter={e => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = '#f0ebe4';
-                      e.currentTarget.style.borderColor = '#bfb5a8';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = '#fcf8f3';
-                      e.currentTarget.style.borderColor = '#d6cdc0';
-                    }
+                    marginBottom: isActive ? -1 : 0,
+                    marginTop: isOdd ? 6 : 0,
+                    zIndex: isActive ? 5 : 1,
                   }}
                 >
+                  {/* HUD corners — active tab only */}
+                  {isActive && (<>
+                    <span style={{ position: 'absolute', top: 3, left: 3, width: 6, height: 6, borderTop: `1.5px solid ${color}`, borderLeft: `1.5px solid ${color}`, pointerEvents: 'none' }} />
+                    <span style={{ position: 'absolute', top: 3, right: 3, width: 6, height: 6, borderTop: `1.5px solid ${color}`, borderRight: `1.5px solid ${color}`, pointerEvents: 'none' }} />
+                  </>)}
+                  {/* Color dot */}
                   <span style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: isActive ? color : '#cbc0b2',
-                    flexShrink: 0,
+                    width: 5, height: 5, flexShrink: 0,
+                    background: isActive ? color : 'var(--tx3)',
+                    opacity: isActive ? 1 : 0.4,
                   }} />
-                  <span style={{ letterSpacing: '0.02em' }}>{f.name}</span>
+                  {f.name}
                   <span style={{
-                    fontSize: 9,
-                    opacity: 0.6,
-                    marginLeft: 'auto',
-                    background: isActive ? '#e8dfd6' : '#eae3db',
-                    padding: '0 6px',
-                    borderRadius: 10,
-                    lineHeight: '16px',
-                    color: '#5f5344',
-                  }}>
-                    {f.count}
-                  </span>
+                    fontSize: 8, fontWeight: 600,
+                    color: isActive ? color : 'var(--tx3)',
+                    opacity: isActive ? 0.8 : 0.4,
+                  }}>{f.count}</span>
                 </button>
               );
             })}
             <button
               onClick={() => setNewFolderOpen(true)}
+              title="nova pasta"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 16px 6px 12px',
-                borderRadius: '4px 16px 16px 4px',
-                border: '1px dashed #cbc0b2',
-                background: 'transparent',
-                color: '#8a7d6e',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                cursor: 'pointer',
-                marginTop: 6,
-                transition: 'all 0.15s',
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px 6px',
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                color: 'var(--tx3)', background: 'transparent',
+                border: '1px dashed var(--brd)', borderBottom: '1px solid var(--brd)',
+                borderRadius: 0, cursor: 'pointer',
+                transition: 'all 0.12s', whiteSpace: 'nowrap', marginTop: 6,
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'var(--acc)';
-                e.currentTarget.style.color = 'var(--acc)';
-                e.currentTarget.style.background = '#fcf8f3';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#cbc0b2';
-                e.currentTarget.style.color = '#8a7d6e';
-                e.currentTarget.style.background = 'transparent';
-              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--acc)'; e.currentTarget.style.borderColor = 'var(--acc)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--tx3)'; e.currentTarget.style.borderColor = 'var(--brd)'; }}
             >
-              <Plus size={10} /> nova etiqueta
+              <Plus size={9} /> nova
             </button>
           </div>
 
-          {/* ── Coluna da tabela ── */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* ── Corpo da tabela (conectado às etiquetas) ── */}
+          <div style={{ position: 'relative', zIndex: 2 }}>
 
             {filtered.length > 0 ? (<>
             <div style={{
               border: '1px solid var(--brd)',
+              borderTop: '1px solid var(--brd)',
               background: 'var(--bg1)',
               overflowX: 'auto', overflowY: 'hidden',
-              borderRadius: '6px',
+              borderRadius: 0,
             }}>
               {/* Header */}
               <div style={{
@@ -1288,7 +1287,7 @@ export function Acervo({ profileId }) {
                 padding: '6px 12px', borderTop: '1px solid var(--brd)',
                 fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
                 display: 'flex', justifyContent: 'space-between', background: 'var(--bg2)',
-                borderRadius: '0 0 6px 6px',
+                borderRadius: 0,
               }}>
                 <span>{filtered.length} ref{filtered.length !== 1 ? 's' : ''}</span>
                 {selectedIds.size > 0 && (
@@ -1319,7 +1318,7 @@ export function Acervo({ profileId }) {
             )}
             </>) : (
               <div style={{
-                border: '1px solid var(--brd)', borderRadius: '6px',
+                border: '1px solid var(--brd)', borderRadius: 0,
                 textAlign: 'center', padding: '48px 20px',
                 color: 'var(--tx3)', fontFamily: 'var(--font-mono)', fontSize: 12,
                 background: 'var(--bg1)',
