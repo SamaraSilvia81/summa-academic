@@ -1,31 +1,48 @@
 .side {
   width: var(--sidebar-w);
-  min-height: 100vh;
-  background: var(--bg1);
-  border-right: 1px solid var(--brd);
+  /* background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0)), var(--bg1); */
+  background: linear-gradient(180deg, rgba(5, 1, 20, 0.516), transparent), var(--bg1);
+  background-color: color-mix(in srgb, var(--bg1) 62%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: var(--r-xl);
   display: flex; flex-direction: column;
-  padding: 12px 0 10px;
-  position: fixed; left: 0; top: 0; bottom: 0; z-index: 100;
-  transition: width 0.28s cubic-bezier(0.25,0.1,0.25,1);
+  padding: 18px 0 16px;
+  position: fixed;
+  left: var(--sidebar-inset); top: var(--sidebar-inset); bottom: var(--sidebar-inset);
+  z-index: 100;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.02);
+  transition: width 0.28s cubic-bezier(0.25,0.1,0.25,1), box-shadow 0.28s;
   overflow: hidden;
 }
-.side:hover { width: var(--sidebar-w-open); }
+.side:hover {
+  width: var(--sidebar-w-open);
+  box-shadow: 0 20px 52px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.03);
+}
 .side:hover .niLabel,
 .side:hover .niJp,
 .side:hover .logoName,
 .side:hover .userDetail,
-.side:hover .actionLabel { opacity: 1; max-width: 140px; }
+.side:hover .actionLabel,
+.side:hover .groupLabel { opacity: 1; max-width: 160px; }
+
+:global(body.light) .side {
+  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.2)), var(--bg1);
+  background-color: color-mix(in srgb, var(--bg2) 55%, transparent);
+  border: 1px solid rgba(255,255,255,0.5);
+}
 
 /* ── Logo ── */
 .logoRow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 4px 0 20px;
-  margin: 0 10px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 0 26px;
+  margin: 0 16px;
   overflow: hidden; white-space: nowrap;
 }
 .logoS {
-  width: 36px; height: 36px; min-width: 36px;
-  border-radius: 8px;
+  width: 40px; height: 40px; min-width: 40px;
+  border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
@@ -35,18 +52,34 @@
 :global(body.light) .logoLight { display: block; }
 .logoName {
   font-family: var(--font-display);
-  font-weight: 700; font-size: 16px; color: var(--tx);
+  font-weight: 700; font-size: 17px; color: var(--tx);
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
 }
 .logoName b { color: var(--acc); font-weight: 800; }
 
 /* ── Nav ── */
-.nav { flex: 1; padding: 0 8px; }
+.nav { flex: 1; padding: 0 12px; overflow-y: auto; overflow-x: hidden; }
 
-/* shared icon wrapper — forces consistent 36px hit area */
+/* ── Nav groups ── */
+.navGroup { margin-bottom: 6px; }
+.groupSep {
+  height: 1px; background: var(--brd);
+  margin: 16px 6px 14px;
+}
+.groupLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--tx3);
+  padding: 0 10px 10px 12px;
+  white-space: nowrap; overflow: hidden;
+  opacity: 0; max-width: 0;
+  transition: opacity 0.2s, max-width 0.28s;
+}
+
+/* shared icon wrapper — forces consistent hit area */
 .niIcon {
-  width: 36px; min-width: 36px; height: 36px;
+  width: 38px; min-width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
@@ -54,15 +87,15 @@
 /* ── Nav items ── */
 .ni {
   display: flex; align-items: center;
-  gap: 4px;
-  padding: 2px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 10px;
   cursor: pointer; color: var(--tx2);
-  transition: all 0.18s; margin-bottom: 2px;
+  transition: all 0.18s; margin-bottom: 6px;
   white-space: nowrap; overflow: hidden;
   text-decoration: none;
 }
-.ni:hover { color: var(--tx); background: var(--bg3); }
+.ni:hover { color: var(--tx); background: rgba(255,255,255,0.06); }
 .ni.active { color: var(--acc); background: var(--acc-bg); }
 
 .niLabel {
@@ -80,25 +113,25 @@
 }
 
 /* ── Bottom ── */
-.bottom { padding: 0 8px; }
+.bottom { padding: 0 12px; }
 
 .separator {
   height: 1px; background: var(--brd);
-  margin: 8px 6px;
+  margin: 14px 8px;
 }
 
 /* ── Action buttons ── */
-.actions { display: flex; flex-direction: column; gap: 2px; }
+.actions { display: flex; flex-direction: column; gap: 4px; }
 .actionBtn {
   display: flex; align-items: center;
-  gap: 4px; padding: 2px;
-  border-radius: 8px;
+  gap: 8px; padding: 4px 6px;
+  border-radius: 10px;
   cursor: pointer; color: var(--tx3);
   transition: all 0.18s;
   background: none; border: none;
   text-decoration: none; width: 100%;
 }
-.actionBtn:hover { color: var(--acc); background: var(--bg3); }
+.actionBtn:hover { color: var(--acc); background: rgba(255,255,255,0.06); }
 .actionLabel {
   font-family: var(--font-display);
   font-size: 14px; font-weight: 500;
@@ -110,14 +143,14 @@
 /* ── User ── */
 .user {
   display: flex; align-items: center;
-  gap: 4px; padding: 2px;
-  border-radius: 8px;
+  gap: 8px; padding: 6px;
+  border-radius: 10px;
   cursor: pointer; overflow: hidden;
 }
-.user:hover { background: var(--bg3); }
+.user:hover { background: rgba(255,255,255,0.06); }
 .avatar {
-  width: 36px; height: 36px; min-width: 36px;
-  border-radius: 8px;
+  width: 28px; height: 38px; min-width: 38px;
+  border-radius: 10px;
   background: var(--bg4);
   border: 2px solid var(--acc);
   display: flex; align-items: center; justify-content: center;

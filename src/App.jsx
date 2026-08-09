@@ -96,7 +96,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar profileName={profile.name} institution={profile.institution} profileId={profile.id} />
-      <main style={{ flex: 1, marginLeft: 'var(--sidebar-w)', minHeight: '100vh' }}>
+      <main style={{ flex: 1, marginLeft: 'calc(var(--sidebar-inset) + var(--sidebar-w) + var(--sidebar-gap))', minHeight: '100vh' }}>
         <Topbar currentView={currentView} profile={profile} search={globalSearch} onSearch={setGlobalSearch} />
         <div style={{ padding: '0 24px 40px' }}>
           <Routes>

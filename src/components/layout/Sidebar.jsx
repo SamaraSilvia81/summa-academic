@@ -6,13 +6,23 @@ import { saveSettings } from '../../store/slices/dataSlice';
 import { signOutUser, selectProfile } from '../../store/slices/authSlice';
 import styles from './Sidebar.module.css';
 
-const NAV_ITEMS = [
-  { to: '/farol',   icon: Lightning,   label: 'Farol'},
-  { to: '/bancada', icon: NotePencil,  label: 'Bancada'},
-  { to: '/acervo',  icon: Books,       label: 'Acervo'},
-  { to: '/pauta',   icon: List,        label: 'Pauta'},
-  { to: '/vitrine', icon: ThreadsLogo, label: 'Vitrine'},
-  { to: '/dataset', icon: Graph,       label: 'Dataset'},
+const NAV_GROUPS = [
+  {
+    label: 'Ferramentas',
+    items: [
+      { to: '/farol',   icon: Lightning,   label: 'Farol'},
+      { to: '/bancada', icon: NotePencil,  label: 'Bancada'},
+      { to: '/acervo',  icon: Books,       label: 'Acervo'},
+      { to: '/dataset', icon: Graph,       label: 'Dataset'},
+    ],
+  },
+  {
+    label: 'Gestão',
+    items: [
+      { to: '/pauta',   icon: List,        label: 'Pauta'},
+      { to: '/vitrine', icon: ThreadsLogo, label: 'Vitrine'},
+    ],
+  },
 ];
 
 function getAvatarUrl(user, profile) {
@@ -65,36 +75,43 @@ export function Sidebar({ profileName, institution, profileId }) {
 
       {/* Nav */}
       <nav className={styles.nav}>
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
-          const isActive = location.pathname.startsWith(to);
-          const isFarol = to === '/farol';
-          const badge = isFarol && unreadCount > 0 ? unreadCount : null;
-          return (
-            <NavLink key={to} to={to} className={`${styles.ni} ${isActive ? styles.active : ''}`} title={label}>
-              <span className={styles.niIcon} style={{ position: 'relative' }}>
-                <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
-                {badge && (
-                  <span style={{
-                    position: 'absolute', top: -4, right: -5,
-                    minWidth: 14, height: 14, borderRadius: 7,
-                    background: 'var(--acc)', color: 'var(--bg0)',
-                    fontSize: 9, fontWeight: 800, fontFamily: 'var(--font-mono)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 3px', lineHeight: 1,
-                    boxShadow: '0 0 6px var(--acc-glow)',
-                  }}>
-                    {badge > 99 ? '99+' : badge}
+        {NAV_GROUPS.map((group, gi) => (
+          <div className={styles.navGroup} key={group.label}>
+            {gi > 0 && <div className={styles.groupSep} />}
+            <div className={styles.groupLabel}>{group.label}</div>
+            {group.items.map(({ to, icon: Icon, label }) => {
+              const isActive = location.pathname.startsWith(to);
+              const isFarol = to === '/farol';
+              const badge = isFarol && unreadCount > 0 ? unreadCount : null;
+              return (
+                <NavLink key={to} to={to} className={`${styles.ni} ${isActive ? styles.active : ''}`} title={label}>
+                  <span className={styles.niIcon} style={{ position: 'relative' }}>
+                    <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+                    {badge && (
+                      <span style={{
+                        position: 'absolute', top: -4, right: -5,
+                        minWidth: 14, height: 14, borderRadius: 7,
+                        background: 'var(--acc)', color: 'var(--bg0)',
+                        fontSize: 9, fontWeight: 800, fontFamily: 'var(--font-mono)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '0 3px', lineHeight: 1,
+                        boxShadow: '0 0 6px var(--acc-glow)',
+                      }}>
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span className={styles.niLabel}>{label}</span>
-            </NavLink>
-          );
-        })}
+                  <span className={styles.niLabel}>{label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}
       <div className={styles.bottom}>
+        <div className={styles.groupLabel}>Config</div>
         <div className={styles.actions}>
           <button className={styles.actionBtn} onClick={toggleTheme} title={isDark ? 'Modo claro' : 'Modo escuro'}>
             <span className={styles.niIcon}>{isDark ? <Sun size={18} /> : <Moon size={18} />}</span>
@@ -120,7 +137,7 @@ export function Sidebar({ profileName, institution, profileId }) {
             alt={profileName}
             className={styles.avatar}
             style={{
-              width: 32, height: 32, borderRadius: '50%',
+              width: 40, height: 40, borderRadius: '50%',
               objectFit: 'cover', border: '2px solid var(--acc)',
             }}
             onError={e => {

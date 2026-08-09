@@ -21,12 +21,12 @@
   --font-quote: 'Playfair Display', serif;
 
   /* Backgrounds - Dark */
-  --bg0: #04070d;
-  --bg1: #080c14;
-  --bg2: #0e1119;
-  --bg3: #161a24;
-  --bg4: #1e2230;
-  --bg5: #262a38;
+  --bg0: #06040f; /* #04070d*/
+  --bg1: #0a0814; /* #0008 080c14 */
+  --bg2: #141220;
+  --bg3: #231f31;
+  --bg4: #231e30;
+  --bg5: #2a2638;
 
   /* Text */
   --tx: #E2DED8;
@@ -58,16 +58,18 @@
   --font-quote: 'Playfair Display', serif;
 
   /* Sidebar */
-  --sidebar-w: 56px;
-  --sidebar-w-open: 196px;
+  --sidebar-w: 80px;
+  --sidebar-w-open: 226px;
+  --sidebar-inset: 12px;
+  --sidebar-gap: 14px;
 }
 
 /* ── Light Mode ────────────────────────────────────────── */
 body.light {
-  --acc: #9D6A14;
+  --acc: #b17f29;
   --acc2: #B88724;
-  --acc3: #7A4F0D;
-  --acc-bg: rgba(157,106,20,0.12);
+  --acc3: #72511f;
+  --acc-bg: rgba(151, 108, 34, 0.12);
   --acc-bg2: rgba(157,106,20,0.07);
   --acc-glow: rgba(157,106,20,0.10);
   --bg0: #F4EFE5;
