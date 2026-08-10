@@ -17,6 +17,7 @@ import { Acervo } from './components/acervo/Acervo';
 import { Settings } from './components/settings/Settings';
 import { Onboarding } from './components/onboarding/Onboarding';
 import { EmptyModule } from './components/shared/EmptyModule';
+import { Home } from './components/home/Home';
 import './styles/global.css';
 
 function nextPhase(user, profile) {
@@ -100,7 +101,8 @@ export default function App() {
         <Topbar currentView={currentView} profile={profile} search={globalSearch} onSearch={setGlobalSearch} />
         <div style={{ padding: '0 24px 40px' }}>
           <Routes>
-            <Route path="/" element={<Navigate to="/farol" replace />} />
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<Home profileId={profile.id} />} />
             <Route path="/farol" element={<Farol profileId={profile.id} />} />
             <Route path="/bancada" element={<BancadaPage profileId={profile.id} search={globalSearch} />} />
             <Route path="/bancada/editor" element={<EditorPage profileId={profile.id} />} />

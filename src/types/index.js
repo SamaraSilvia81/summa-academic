@@ -1,16 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
 export const VIEW_META = {
+  home: {
+    title: 'Home', titleJp: 'ホーム',
+    badge: '', cta: '', ctaIcon: '',
+    secondary: '', secondaryIcon: ''
+  },
   farol: {
     title: 'Farol', titleJp: '灯台',
     badge: '', cta: 'Nova NP', ctaIcon: 'Plus',

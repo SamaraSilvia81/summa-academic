@@ -1,43 +1,102 @@
 .side {
   width: var(--sidebar-w);
   /* background: linear-gradient(180deg, rgba(5, 1, 20, 0.516), transparent), var(--bg1); */
-  background: linear-gradient(180deg, rgba(5, 7, 21, 0.447), transparent), var(--bg1);
-  background-color: color-mix(in srgb, var(--bg1) 62%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  backdrop-filter: blur(22px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  /* background: linear-gradient(180deg, rgba(5, 7, 21, 0.447), transparent), var(--bg1); */
+  /* background: #0f0b18; */
+  /* background: linear-gradient(180deg, #2a1e08 0%, #1a1204 50%, #110d03 100%); */
+  /* background-color: color-mix(in srgb, var(--bg1) 62%, transparent); */
+  /* ── dark mode: sidebar CLARO (warm cream) ── */
+  background: linear-gradient(180deg, #F4EFE5 0%, #EDE5D8 100%);
+  border: 1px solid rgba(45,34,20,0.12);
   border-radius: var(--r-xl);
   display: flex; flex-direction: column;
   padding: 18px 0 16px;
   position: fixed;
   left: var(--sidebar-inset); top: var(--sidebar-inset); bottom: var(--sidebar-inset);
   z-index: 100;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.02);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35);
   transition: width 0.28s cubic-bezier(0.25,0.1,0.25,1), box-shadow 0.28s;
-  overflow: hidden;
+  overflow: visible;
 }
 .side:hover {
   width: var(--sidebar-w-open);
-  box-shadow: 0 20px 52px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.03);
+  box-shadow: 0 20px 52px rgba(0,0,0,0.45);
 }
 .side:hover .niLabel,
 .side:hover .niJp,
 .side:hover .logoName,
 .side:hover .userDetail,
 .side:hover .actionLabel,
-.side:hover .groupLabel { opacity: 1; max-width: 160px; }
+.side:hover .subNav,
+.side:hover .groupLabel { opacity: 1; max-width: 200px; max-height: 200px; }
 
-:global(body.light) .side {
-  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.2)), var(--bg1);
-  background-color: color-mix(in srgb, var(--bg2) 55%, transparent);
-  border: 1px solid rgba(255,255,255,0.5);
+/* ── dark mode: sidebar claro — cores dos textos/itens ── */
+.ni { color: rgba(60,50,30,0.55); }
+.ni:hover { color: #3c321e; background: rgba(45,34,20,0.06); }
+.ni.active {
+  color: var(--tx);
+  background: var(--bg0);
+  border-radius: 12px 0 0 12px;
+  margin-right: calc(-1 * (var(--sidebar-inset) + 2px));
+  padding-right: calc(var(--sidebar-inset) + 10px);
+  box-shadow: none;
+  position: relative;
+  z-index: 10;
 }
+
+
+.groupSep { background: rgba(45,34,20,0.1); }
+.groupLabel { color: rgba(120,100,60,0.5); }
+.actionBtn { color: rgba(60,50,30,0.45); }
+.actionBtn:hover { color: #b17f29; background: rgba(45,34,20,0.06); }
+.actionLabel { color: rgba(60,50,30,0.55); }
+.separator { background: rgba(45,34,20,0.1); }
+.userName { color: #171512; }
+.userRole { color: rgba(120,100,60,0.5); }
+.logoName { color: #171512; }
+.logoName b { color: #b17f29; }
+.subItem { color: rgba(60,50,30,0.45); border-left-color: rgba(45,34,20,0.12); }
+.subItem:hover { color: #3c321e; background: rgba(45,34,20,0.04); border-left-color: #b17f29; }
+.niLabel { color: inherit; }
+
+/* ── light mode: sidebar ESCURO ── */
+:global(body.light) .side {
+  background: linear-gradient(180deg, #1a1610 0%, #110e08 100%);
+  border: 1px solid rgba(212,160,48,0.1);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.2);
+}
+:global(body.light) .ni { color: rgba(226,222,216,0.5); }
+:global(body.light) .ni:hover { color: #E2DED8; background: rgba(212,160,48,0.08); }
+:global(body.light) .ni.active {
+  color: var(--tx);
+  background: var(--bg0);
+  border-radius: 12px 0 0 12px;
+  margin-right: calc(-1 * (var(--sidebar-inset) + 2px));
+  padding-right: calc(var(--sidebar-inset) + 10px);
+  box-shadow: none;
+  position: relative;
+  z-index: 10;
+}
+
+
+:global(body.light) .niLabel { color: inherit; }
+:global(body.light) .groupLabel { color: rgba(212,160,48,0.35); }
+:global(body.light) .groupSep { background: rgba(212,160,48,0.1); }
+:global(body.light) .actionBtn { color: rgba(226,222,216,0.4); }
+:global(body.light) .actionBtn:hover { color: var(--acc); }
+:global(body.light) .actionLabel { color: rgba(226,222,216,0.5); }
+:global(body.light) .userName { color: #E2DED8; }
+:global(body.light) .userRole { color: rgba(212,160,48,0.4); }
+:global(body.light) .separator { background: rgba(212,160,48,0.1); }
+:global(body.light) .logoName { color: #E2DED8; }
+:global(body.light) .logoName b { color: var(--acc); }
+:global(body.light) .subItem { color: rgba(226,222,216,0.35); border-left-color: rgba(212,160,48,0.1); }
+:global(body.light) .subItem:hover { color: #E2DED8; }
 
 /* ── Logo ── */
 .logoRow {
   display: flex; align-items: center; gap: 12px;
-  padding: 4px 0 26px;
-  margin: 0 16px;
+  padding: 4px 0 26px; margin: 0 16px;
   overflow: hidden; white-space: nowrap;
 }
 .logoS {
@@ -47,120 +106,164 @@
   overflow: hidden;
 }
 .logoS img { width: 100%; height: 100%; object-fit: cover; }
+/* dark mode sidebar claro: mostrar logo escura */
 .logoLight { display: none; }
+.logoDark { display: block; }
+/* light mode sidebar escuro: mostrar logo clara */
 :global(body.light) .logoDark { display: none; }
 :global(body.light) .logoLight { display: block; }
 .logoName {
   font-family: var(--font-display);
-  font-weight: 700; font-size: 17px; color: var(--tx);
+  font-weight: 700; font-size: 17px;
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
 }
-.logoName b { color: var(--acc); font-weight: 800; }
 
 /* ── Nav ── */
-.nav { flex: 1; padding: 0 12px; overflow-y: auto; overflow-x: hidden; }
+.nav { flex: 1; padding: 0 12px; overflow: visible; display: flex; flex-direction: column; }
 
-/* ── Nav groups ── */
-.navGroup { margin-bottom: 6px; }
-.groupSep {
-  height: 1px; background: var(--brd);
-  margin: 16px 6px 14px;
+/* navScroll: é quem realmente scrolls, mas overflow-x: visible pra scoops vazarem */
+.navScroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: clip; /* clip permite pseudo-elements absolutos vazarem; visible quebraria com overflow-y:auto */
+  padding-right: 0;
 }
+
+.navGroup { margin-bottom: 6px; }
+/* ── niWrapper: container do item ativo que "expande" pra acomodar os scoops ── */
+/* Expande verticalmente mas compensa com margem negativa: sem impacto no layout */
+.niWrapper {
+  position: relative;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  margin-top: -16px;
+  margin-bottom: -16px;
+  overflow: visible;
+}
+
+/* Scoop superior: fica no topo do niWrapper (que começa 16px acima do item visual) */
+.niWrapper::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border-radius: 0 0 12px 0;
+  box-shadow: 6px 6px 0 6px var(--bg0);
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* Scoop inferior: fica na base do niWrapper */
+.niWrapper::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border-radius: 0 12px 0 0;
+  box-shadow: 6px -6px 0 6px var(--bg0);
+  pointer-events: none;
+  z-index: 9;
+}
+
 .groupLabel {
   font-family: var(--font-mono);
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em;
-  text-transform: uppercase; color: var(--tx3);
-  padding: 0 10px 10px 12px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0 10px 8px 14px;
   white-space: nowrap; overflow: hidden;
   opacity: 0; max-width: 0;
   transition: opacity 0.2s, max-width 0.28s;
 }
+.groupSep { height: 1px; margin: 16px 6px 14px; }
 
-/* shared icon wrapper — forces consistent hit area */
 .niIcon {
   width: 38px; min-width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 
-/* ── Nav items ── */
 .ni {
-  display: flex; align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  cursor: pointer; color: var(--tx2);
-  transition: all 0.18s; margin-bottom: 6px;
-  white-space: nowrap; overflow: visible;
-  text-decoration: none;
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 6px; border-radius: 10px;
+  cursor: pointer; transition: all 0.18s; margin-bottom: 4px;
+  white-space: nowrap; overflow: visible; text-decoration: none;
 }
-.ni:hover { color: var(--tx); background: rgba(255,255,255,0.06); }
-.ni.active { color: var(--acc); background: var(--acc-bg); }
 
 .niLabel {
   font-family: var(--font-display);
-  font-size: 15px; font-weight: 500;
+  font-size: 14px; font-weight: 500;
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
 }
 .niJp {
   font-family: var(--font-mono);
-  font-size: 11px; color: var(--tx3);
+  font-size: 11px;
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
   margin-left: auto; padding-right: 8px;
 }
 
+/* ── Sub-nav ── */
+.subNav {
+  opacity: 0; max-height: 0; overflow: hidden;
+  transition: opacity 0.2s, max-height 0.3s;
+  padding-left: 24px;
+}
+.subItem {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px 4px 16px;
+  font-family: var(--font-mono); font-size: 12px;
+  cursor: pointer; text-decoration: none;
+  border-left: 1px solid; transition: all 0.12s;
+  white-space: nowrap; border-radius: 0 6px 6px 0;
+}
+
 /* ── Bottom ── */
 .bottom { padding: 0 12px; }
+.separator { height: 1px; margin: 14px 8px; }
 
-.separator {
-  height: 1px; background: var(--brd);
-  margin: 14px 8px;
-}
-
-/* ── Action buttons ── */
 .actions { display: flex; flex-direction: column; gap: 4px; }
 .actionBtn {
-  display: flex; align-items: center;
-  gap: 8px; padding: 4px 6px;
-  border-radius: 10px;
-  cursor: pointer; color: var(--tx3);
-  transition: all 0.18s;
-  background: none; border: none;
-  text-decoration: none; width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: 10px;
+  cursor: pointer; transition: all 0.18s;
+  background: none; border: none; width: 100%;
 }
-.actionBtn:hover { color: var(--acc); background: rgba(255,255,255,0.06); }
 .actionLabel {
   font-family: var(--font-display);
   font-size: 14px; font-weight: 500;
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
-  white-space: nowrap; color: var(--tx2);
+  white-space: nowrap;
 }
 
-/* ── User ── */
 .user {
-  display: flex; align-items: center;
-  gap: 8px; padding: 6px;
-  border-radius: 10px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px; border-radius: 10px;
   cursor: pointer; overflow: hidden;
 }
-.user:hover { background: rgba(255,255,255,0.06); }
+.user:hover { background: rgba(45,34,20,0.06); }
+:global(body.light) .user:hover { background: rgba(212,160,48,0.06); }
 .avatar {
   width: 28px; height: 38px; min-width: 38px;
   border-radius: 10px;
-  background: var(--bg4);
-  border: 2px solid var(--acc);
+  border: 2px solid #b17f29;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display);
-  font-weight: 700; font-size: 13px; color: var(--acc);
+  font-weight: 700; font-size: 13px; color: #b17f29;
 }
+:global(body.light) .avatar { border-color: var(--acc); color: var(--acc); }
 .userDetail {
   opacity: 0; max-width: 0; overflow: hidden;
   transition: opacity 0.22s, max-width 0.28s;
   white-space: nowrap; padding-left: 6px;
 }
-.userName { font-size: 14px; font-weight: 500; color: var(--tx); }
-.userRole { font-size: 12px; color: var(--tx3); }
+.userName { font-size: 14px; font-weight: 500; }
+.userRole { font-size: 12px; }
