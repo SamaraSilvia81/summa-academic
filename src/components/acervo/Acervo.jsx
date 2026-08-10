@@ -1,6 +1,6 @@
 ﻿import { useRef, useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   MagnifyingGlass, Star, Plus, X, Paperclip, DownloadSimple,
   Trash, CloudArrowUp, FilePdf, Spinner, LinkSimple, ArrowSquareOut,
@@ -159,6 +159,7 @@ function useReferenceFolders(profileId) {
 export function Acervo({ profileId }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { tab, folderId } = useParams();
   const references = useReferences(profileId);
   const settings = useSettings(profileId);
@@ -202,6 +203,15 @@ export function Acervo({ profileId }) {
   const [dossieRef, setDossieRef] = useState(null);
   const [page, setPage] = useState(0);
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  // ── Deep-link: abrir dossiê direto de fora (ex: grafo da Home) ──
+  useEffect(() => {
+    const openRefId = location.state?.openRefId;
+    if (!openRefId || !references?.length) return;
+    const ref = references.find(r => r.id === openRefId);
+    if (ref) setDossieRef(ref);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, references]);
 
   // ── Seleção múltipla ──
   const [selectedIds, setSelectedIds] = useState(new Set());

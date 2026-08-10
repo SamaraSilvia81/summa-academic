@@ -1,6 +1,6 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Lightning, NotePencil, Books, List, ThreadsLogo, Graph, Sun, Moon, SignOut, House, BookOpenText, BookmarkSimple, Folder, GearSix } from '@phosphor-icons/react';
+import { Lightning, NotePencil, Books, List, ThreadsLogo, Graph, Sun, Moon, SignOut, House, BookOpenText, BookmarkSimple, Folder } from '@phosphor-icons/react';
 import { useSettings } from '../../hooks/useData';
 import { saveSettings } from '../../store/slices/dataSlice';
 import { signOutUser, selectProfile } from '../../store/slices/authSlice';
@@ -132,12 +132,7 @@ export function Sidebar({ profileName, institution, profileId }) {
 
       {/* Bottom */}
       <div className={styles.bottom}>
-        <div className={styles.groupLabel}>Config</div>
         <div className={styles.actions}>
-          <button className={styles.actionBtn} onClick={() => navigate('/settings')} title="Configurações">
-            <span className={styles.niIcon}><GearSix size={18} /></span>
-            <span className={styles.actionLabel}>Config</span>
-          </button>
           <button className={styles.actionBtn} onClick={toggleTheme} title={isDark ? 'Modo claro' : 'Modo escuro'}>
             <span className={styles.niIcon}>{isDark ? <Sun size={18} /> : <Moon size={18} />}</span>
             <span className={styles.actionLabel}>{isDark ? 'Claro' : 'Escuro'}</span>

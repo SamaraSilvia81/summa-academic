@@ -5,6 +5,7 @@ import {
   TrendUp, CaretRight, CalendarBlank, House,
 } from '@phosphor-icons/react';
 import { useReferences, useDocuments, useRadarItems, useRadarStats, useProfile } from '../../hooks/useData';
+import { ReferenceGraph } from './ReferenceGraph';
 
 function StatCard({ label, value, color, icon: Icon, sub, onClick }) {
   return (
@@ -267,6 +268,12 @@ export function Home({ profileId }) {
           sub={unreadRadar > 0 ? 'não lidas' : undefined}
           onClick={() => navigate('/farol')} />
       </div>
+
+      {/* ── Grafo de referências ── */}
+      <Card style={{ marginBottom: 18, padding: '18px 20px 14px' }}>
+        <SectionHeader icon={Graph} title="mapa de referências" action="ver acervo" onAction={() => navigate('/acervo')} />
+        <ReferenceGraph references={refs} profileId={profileId} />
+      </Card>
 
       {/* ── Progress bar ── */}
       <Card style={{ marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 16, padding: '14px 20px' }}>

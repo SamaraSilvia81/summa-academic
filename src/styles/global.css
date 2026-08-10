@@ -65,9 +65,9 @@
   --font-quote: 'Playfair Display', serif;
 
   /* Sidebar */
-  --sidebar-w: 80px;
-  --sidebar-w-open: 226px;
-  --sidebar-inset: 12px;
+  --sidebar-w: 68px;
+  --sidebar-w-open: 220px;
+  --sidebar-inset: 14px;
   --sidebar-gap: 14px;
 }
 

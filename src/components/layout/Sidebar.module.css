@@ -1,16 +1,10 @@
 .side {
   width: var(--sidebar-w);
-  /* background: linear-gradient(180deg, rgba(5, 1, 20, 0.516), transparent), var(--bg1); */
-  /* background: linear-gradient(180deg, rgba(5, 7, 21, 0.447), transparent), var(--bg1); */
-  /* background: #0f0b18; */
-  /* background: linear-gradient(180deg, #2a1e08 0%, #1a1204 50%, #110d03 100%); */
-  /* background-color: color-mix(in srgb, var(--bg1) 62%, transparent); */
-  /* ── dark mode: sidebar CLARO (warm cream) ── */
   background: linear-gradient(180deg, #F4EFE5 0%, #EDE5D8 100%);
   border: 1px solid rgba(45,34,20,0.12);
   border-radius: var(--r-xl);
   display: flex; flex-direction: column;
-  padding: 18px 0 16px;
+  padding: 14px 0 12px;
   position: fixed;
   left: var(--sidebar-inset); top: var(--sidebar-inset); bottom: var(--sidebar-inset);
   z-index: 100;
@@ -37,13 +31,12 @@
   color: var(--tx);
   background: var(--bg0);
   border-radius: 12px 0 0 12px;
-  margin-right: calc(-1 * (var(--sidebar-inset) + 2px));
-  padding-right: calc(var(--sidebar-inset) + 10px);
+  margin-right: -14px;
+  padding-right: 20px;
   box-shadow: none;
   position: relative;
   z-index: 10;
 }
-
 
 .groupSep { background: rgba(45,34,20,0.1); }
 .groupLabel { color: rgba(120,100,60,0.5); }
@@ -71,13 +64,12 @@
   color: var(--tx);
   background: var(--bg0);
   border-radius: 12px 0 0 12px;
-  margin-right: calc(-1 * (var(--sidebar-inset) + 2px));
-  padding-right: calc(var(--sidebar-inset) + 10px);
+  margin-right: -14px;
+  padding-right: 20px;
   box-shadow: none;
   position: relative;
   z-index: 10;
 }
-
 
 :global(body.light) .niLabel { color: inherit; }
 :global(body.light) .groupLabel { color: rgba(212,160,48,0.35); }
@@ -96,20 +88,18 @@
 /* ── Logo ── */
 .logoRow {
   display: flex; align-items: center; gap: 12px;
-  padding: 4px 0 26px; margin: 0 16px;
+  padding: 10px 0 36px; margin: 0 14px;
   overflow: hidden; white-space: nowrap;
 }
 .logoS {
-  width: 40px; height: 40px; min-width: 40px;
+  width: 36px; height: 36px; min-width: 36px;
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
 .logoS img { width: 100%; height: 100%; object-fit: cover; }
-/* dark mode sidebar claro: mostrar logo escura */
 .logoLight { display: none; }
 .logoDark { display: block; }
-/* light mode sidebar escuro: mostrar logo clara */
 :global(body.light) .logoDark { display: none; }
 :global(body.light) .logoLight { display: block; }
 .logoName {
@@ -120,19 +110,16 @@
 }
 
 /* ── Nav ── */
-.nav { flex: 1; padding: 0 12px; overflow: visible; display: flex; flex-direction: column; }
+.nav { flex: 1; padding: 0 10px; overflow: visible; display: flex; flex-direction: column; }
 
-/* navScroll: é quem realmente scrolls, mas overflow-x: visible pra scoops vazarem */
 .navScroll {
   flex: 1;
   overflow-y: auto;
-  overflow-x: clip; /* clip permite pseudo-elements absolutos vazarem; visible quebraria com overflow-y:auto */
+  overflow-x: clip;
   padding-right: 0;
 }
 
-.navGroup { margin-bottom: 6px; }
-/* ── niWrapper: container do item ativo que "expande" pra acomodar os scoops ── */
-/* Expande verticalmente mas compensa com margem negativa: sem impacto no layout */
+.navGroup { margin-bottom: 4px; }
 .niWrapper {
   position: relative;
   padding-top: 16px;
@@ -141,30 +128,22 @@
   margin-bottom: -16px;
   overflow: visible;
 }
-
-/* Scoop superior: fica no topo do niWrapper (que começa 16px acima do item visual) */
 .niWrapper::before {
   content: '';
   position: absolute;
-  right: 0;
-  top: 0;
-  width: 16px;
-  height: 16px;
+  right: 0; top: 0;
+  width: 16px; height: 16px;
   background: transparent;
   border-radius: 0 0 12px 0;
   box-shadow: 6px 6px 0 6px var(--bg0);
   pointer-events: none;
   z-index: 9;
 }
-
-/* Scoop inferior: fica na base do niWrapper */
 .niWrapper::after {
   content: '';
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
+  right: 0; bottom: 0;
+  width: 16px; height: 16px;
   background: transparent;
   border-radius: 0 12px 0 0;
   box-shadow: 6px -6px 0 6px var(--bg0);
@@ -176,23 +155,23 @@
   font-family: var(--font-mono);
   font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 0 10px 8px 14px;
+  padding: 0 10px 6px 12px;
   white-space: nowrap; overflow: hidden;
   opacity: 0; max-width: 0;
   transition: opacity 0.2s, max-width 0.28s;
 }
-.groupSep { height: 1px; margin: 16px 6px 14px; }
+.groupSep { height: 1px; margin: 10px 6px 8px; }
 
 .niIcon {
-  width: 38px; min-width: 38px; height: 38px;
+  width: 34px; min-width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 
 .ni {
   display: flex; align-items: center; gap: 6px;
-  padding: 2px 6px; border-radius: 10px;
-  cursor: pointer; transition: all 0.18s; margin-bottom: 4px;
+  padding: 1px 6px; border-radius: 10px;
+  cursor: pointer; transition: all 0.18s; margin-bottom: 2px;
   white-space: nowrap; overflow: visible; text-decoration: none;
 }
 
@@ -226,13 +205,13 @@
 }
 
 /* ── Bottom ── */
-.bottom { padding: 0 12px; }
-.separator { height: 1px; margin: 14px 8px; }
+.bottom { padding: 0 10px; }
+.separator { height: 1px; margin: 10px 8px; }
 
-.actions { display: flex; flex-direction: column; gap: 4px; }
+.actions { display: flex; flex-direction: column; gap: 2px; }
 .actionBtn {
   display: flex; align-items: center; gap: 8px;
-  padding: 4px 6px; border-radius: 10px;
+  padding: 3px 6px; border-radius: 10px;
   cursor: pointer; transition: all 0.18s;
   background: none; border: none; width: 100%;
 }
@@ -246,13 +225,13 @@
 
 .user {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px; border-radius: 10px;
+  padding: 5px; border-radius: 10px;
   cursor: pointer; overflow: hidden;
 }
 .user:hover { background: rgba(45,34,20,0.06); }
 :global(body.light) .user:hover { background: rgba(212,160,48,0.06); }
 .avatar {
-  width: 28px; height: 38px; min-width: 38px;
+  width: 28px; height: 34px; min-width: 34px;
   border-radius: 10px;
   border: 2px solid #b17f29;
   display: flex; align-items: center; justify-content: center;
