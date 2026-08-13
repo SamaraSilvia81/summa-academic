@@ -6,7 +6,7 @@
 
 /* ── Design Tokens ─────────────────────────────────────── */
 :root {
-  /* Accent - Dourado */
+  /* ── PALETA ANTERIOR: Dourado escuro (comentada para rollback) ──────────
   --acc: #D4A030;
   --acc2: #E8C060;
   --acc3: #B8862A;
@@ -14,35 +14,61 @@
   --acc-bg2: rgba(212,160,48,0.06);
   --acc-glow: rgba(212,160,48,0.25);
 
-  /* Font families as CSS vars for use in components */
-  --font-display: 'Plus Jakarta Sans', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-quote: 'Playfair Display', serif;
-
-  /* Backgrounds - Dark */
-  /* --bg0: #06040f;
-  --bg1: #0a0814; 
-  --bg2: #141220;
-  --bg3: #231f31;
-  --bg4: #231e30;
-  --bg5: #2a2638; */
-
+  BG DARK anterior:
   --bg0: #04070d;
   --bg1: #080c14;
   --bg2: #0e1119;
   --bg3: #161a24;
   --bg4: #1e2230;
   --bg5: #262a38;
+  ───────────────────────────────────────────────────────────────────────── */
+
+  /* ── PALETA NOVA: Noir · Laranja · Azul · Creme ─────────── */
+  /* Accent principal — laranja queimado (refs: monopo/growaz/artedate) */
+  --acc: #D95C2A;
+  --acc2: #E8784A;
+  --acc3: #B54020;
+  --acc-bg: rgba(217,92,42,0.12);
+  --acc-bg2: rgba(217,92,42,0.06);
+  --acc-glow: rgba(217,92,42,0.30);
+
+  /* Accent secundário — azul profundo (refs: sphere gradient) */
+  --acc-blue: #3B6BE8;
+  --acc-blue2: #5A88F0;
+  --acc-blue-bg: rgba(59,107,232,0.12);
+  --acc-blue-glow: rgba(59,107,232,0.25);
+
+  /* Font families as CSS vars for use in components */
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-quote: 'Playfair Display', serif;
+
+  /* Backgrounds - Dark (noir profundo, leve virada azulada) */
+  --bg0: #080807;
+  --bg1: #0f0e0d;
+  --bg2: #161512;
+  --bg3: #1e1c18;
+  --bg4: #28251f;
+  --bg5: #332f28;
+
+  /* 
+  --bg0: #0B0E14; 
+  --bg1: #111520;
+  --bg2: #191E2D;
+  --bg3: #22293D;
+  --bg4: #2D354D;
+  --bg5: #39425E;
+  */
 
   /* Text */
-  --tx: #E2DED8;
-  --tx2: #8A8680;
-  --tx3: #4E4C48;
+  --tx: #EDE8E0;
+  --tx2: #8A8278;
+  --tx3: #524E46;
 
   /* Borders */
-  --brd: rgba(255,255,255,0.06);
-  --brd2: rgba(255,255,255,0.1);
+  --brd: rgba(255,255,255,0.055);
+  --brd2: rgba(255,255,255,0.10);
 
   /* Semantic */
   --green: #4ADE80;
@@ -72,24 +98,44 @@
 }
 
 /* ── Light Mode ────────────────────────────────────────── */
+/* ── LIGHT MODO ANTERIOR: Dourado/creme quente (comentado para rollback) ──
 body.light {
-  --acc: #b17f29;
-  --acc2: #B88724;
-  --acc3: #72511f;
-  --acc-bg: rgba(151, 108, 34, 0.12);
-  --acc-bg2: rgba(157,106,20,0.07);
-  --acc-glow: rgba(157,106,20,0.10);
-  --bg0: #F4EFE5;
-  --bg1: #EDE5D8;
-  --bg2: #FFF9EF;
-  --bg3: #F3EBDD;
-  --bg4: #E2D4BF;
-  --bg5: #D6C5A9;
-  --tx: #171512;
-  --tx2: #655E52;
-  --tx3: #9A8D79;
-  --brd: rgba(45,34,20,0.11);
-  --brd2: rgba(45,34,20,0.18);
+  --acc: #b17f29; --acc2: #B88724; --acc3: #72511f;
+  --acc-bg: rgba(151, 108, 34, 0.12); --acc-bg2: rgba(157,106,20,0.07); --acc-glow: rgba(157,106,20,0.10);
+  --bg0: #F4EFE5; --bg1: #EDE5D8; --bg2: #FFF9EF; --bg3: #F3EBDD; --bg4: #E2D4BF; --bg5: #D6C5A9;
+  --tx: #171512; --tx2: #655E52; --tx3: #9A8D79;
+  --brd: rgba(45,34,20,0.11); --brd2: rgba(45,34,20,0.18);
+}
+─────────────────────────────────────────────────────────────────────────── */
+
+body.light {
+  /* Accent laranja (mais saturado no light) */
+  --acc: #C44A1A;
+  --acc2: #D96030;
+  --acc3: #8F3010;
+  --acc-bg: rgba(196,74,26,0.10);
+  --acc-bg2: rgba(196,74,26,0.06);
+  --acc-glow: rgba(196,74,26,0.15);
+
+  /* Accent azul (light) */
+  --acc-blue: #2A52C8;
+  --acc-blue2: #4468DE;
+  --acc-blue-bg: rgba(42,82,200,0.10);
+  --acc-blue-glow: rgba(42,82,200,0.15);
+
+  /* BG creme sofisticado (refs: nexora/artedate light) */
+  --bg0: #F5F0E8;
+  --bg1: #EEE8DC;
+  --bg2: #FAF6EE;
+  --bg3: #F0E9DC;
+  --bg4: #E2D8C8;
+  --bg5: #D4C8B4;
+
+  --tx: #1A1510;
+  --tx2: #5E5648;
+  --tx3: #9A8E7C;
+  --brd: rgba(40,30,15,0.10);
+  --brd2: rgba(40,30,15,0.16);
 }
 
 /* ── Base Reset ────────────────────────────────────────── */
@@ -129,10 +175,10 @@ body::before {
   pointer-events: none;
   z-index: 9998;
   background:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 4px),
-    radial-gradient(circle at 50% 45%, transparent 56%, rgba(0,0,0,0.34) 100%);
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.016) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 45%, transparent 56%, rgba(0,0,0,0.40) 100%);
   mix-blend-mode: screen;
-  opacity: 0.42;
+  opacity: 0.38;
 }
 
 body.no-grain::after { display: none; }
@@ -143,13 +189,13 @@ body.no-scanlines::before { display: none; }
 body.auth-quiet-grain::after { opacity: 0.012; }
 body.auth-quiet-grain::before { opacity: 0.16; }
 
-body.light::after { opacity: 0.045; }
+body.light::after { opacity: 0.050; }
 body.light::before {
   background:
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.035) 0 1px, transparent 1px 4px),
-    radial-gradient(circle at 50% 45%, transparent 58%, rgba(80,55,20,0.16) 100%);
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.030) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 45%, transparent 58%, rgba(60,35,10,0.12) 100%);
   mix-blend-mode: multiply;
-  opacity: 0.5;
+  opacity: 0.48;
 }
 
 /* ── Typography Utilities ──────────────────────────────── */
@@ -180,7 +226,7 @@ body.light::before {
 
 @keyframes glow {
   0%, 100% { text-shadow: 0 0 8px var(--acc-glow); }
-  50% { text-shadow: 0 0 16px rgba(212,160,48,0.4); }
+  50% { text-shadow: 0 0 16px rgba(217,92,42,0.45); }
 }
 
 @keyframes fadeIn {
@@ -215,7 +261,7 @@ body.light::before {
 
 .acervo-btn-ler:hover {
   background: var(--acc2) !important;
-  box-shadow: 0 2px 8px rgba(212,160,48,0.3);
+  box-shadow: 0 2px 8px rgba(217,92,42,0.35);
 }
 
 .acervo-card-btn:hover {
@@ -232,3 +278,64 @@ body.light::before {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
+
+/* ──────────────────────────────────────────────────────────────── */
+/* ── NOVIDADES: Glassmorfismo + Blobs (orgânicos) ── */
+/* ──────────────────────────────────────────────────────────────── */
+
+/* Glass tokens */
+:root {
+  --glass-bg: rgba(15, 14, 13, 0.55);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  --glass-blur: blur(16px) saturate(1.4);
+}
+
+body.light {
+  --glass-bg: rgba(245, 240, 232, 0.60);
+  --glass-border: rgba(40,30,15,0.08);
+  --glass-shadow: 0 8px 32px rgba(60,35,10,0.12);
+  --glass-blur: blur(16px) saturate(1.2);
+}
+
+/* Blobs (formas orgânicas) */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px) saturate(1.6);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.blob-1 {
+  width: 600px;
+  height: 600px;
+  top: -180px;
+  right: -120px;
+  background: radial-gradient(circle at 30% 40%, var(--acc), var(--acc-blue));
+  opacity: 0.6;
+}
+
+.blob-2 {
+  width: 500px;
+  height: 500px;
+  bottom: -120px;
+  left: -100px;
+  background: radial-gradient(circle at 70% 60%, var(--acc-blue), var(--acc));
+  opacity: 0.5;
+}
+
+.blob-3 {
+  width: 350px;
+  height: 350px;
+  top: 50%;
+  right: 5%;
+  background: radial-gradient(circle, var(--acc2), transparent 70%);
+  opacity: 0.35;
+  filter: blur(140px);
+}
+
+/* Light mode – mais suave */
+body.light .blob-1 { opacity: 0.35; width: 550px; height: 550px; }
+body.light .blob-2 { opacity: 0.25; width: 450px; height: 450px; }
+body.light .blob-3 { opacity: 0.20; }

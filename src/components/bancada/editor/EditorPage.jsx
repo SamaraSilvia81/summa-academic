@@ -1,8 +1,12 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useReferences, useAiSuggestions } from '../../../hooks/useData';
 import { DocumentRepo } from '../../../services/repositories';
@@ -10,7 +14,26 @@ import { convertToLatex } from '../../../services/tiptap-to-latex';
 import { EditorToolbar } from './EditorToolbar';
 import { RefsSidebar } from './RefsSidebar';
 import { TemplatePreview } from './TemplatePreview';
+import { MarkdownPreview } from './MarkdownPreview';
 import styles from './EditorPage.module.css';
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+function slugify(str) {
+  return str.split(' ').slice(0, 4).join('_').toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+}
+
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Main ───────────────────────────────────────────────────────────
 
 export function EditorPage({ profileId }) {
   const [searchParams] = useSearchParams();
@@ -21,25 +44,55 @@ export function EditorPage({ profileId }) {
   const [activeDoc, setActiveDoc] = useState(null);
   const [saveStatus, setSaveStatus] = useState('salvo ✓');
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // ── Dual-mode state ──────────────────────────────────────────────
+  // 'md' = markdown mode (textarea + markdown preview split)
+  // 'tex' = latex/wysiwyg mode (tiptap + template preview)
+  const [editorMode, setEditorMode] = useState('md');
+
+  // markdown mode: raw text stored separately
+  const [mdContent, setMdContent] = useState('');
+  const mdRef = useRef(''); // avoid stale closure in autosave
+  const mdTextareaRef = useRef(null);
+
+  // tiptap json (for tex mode)
   const [editorJson, setEditorJson] = useState(null);
 
-  // Load doc
+  // ── Load document ────────────────────────────────────────────────
   useEffect(() => {
     if (docId) {
       DocumentRepo.getById(docId).then(doc => {
-        if (doc) setActiveDoc(doc);
-        else navigate('/bancada');
+        if (!doc) { navigate('/bancada'); return; }
+        setActiveDoc(doc);
+
+        // Determine initial mode from saved metadata or doc type
+        // We store editorMode in doc.editorMode if it exists
+        const savedMode = doc.editorMode ?? (doc.template === 'free' ? 'md' : 'tex');
+        setEditorMode(savedMode);
+
+        // Load content based on mode
+        if (savedMode === 'md') {
+          // markdown stored as plain string in doc.mdContent
+          const md = typeof doc.mdContent === 'string' ? doc.mdContent : '';
+          setMdContent(md);
+          mdRef.current = md;
+        }
       });
     } else {
       navigate('/bancada');
     }
   }, [docId, navigate]);
 
+  // ── TipTap (tex mode) ─────────────────────────────────────────────
   const editor = useEditor({
     extensions: [
       StarterKit,
       Highlight.configure({ multicolor: true }),
       Placeholder.configure({ placeholder: 'Comece a escrever...' }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: activeDoc?.content || '',
     onUpdate: ({ editor: ed }) => {
@@ -51,66 +104,117 @@ export function EditorPage({ profileId }) {
     },
   }, [activeDoc?.id]);
 
-  // Auto-save every 3s (saves JSON)
+  // ── Markdown auto-save (every 3s) ────────────────────────────────
   useEffect(() => {
-    if (!editor || !activeDoc?.id) return;
+    if (editorMode !== 'md' || !activeDoc?.id) return;
     const interval = setInterval(async () => {
-      const json = editor.getJSON();
-      const currentJson = JSON.stringify(json);
-      const savedJson = JSON.stringify(activeDoc.content);
-
-      if (currentJson !== savedJson) {
-        try {
-          const wc = editor.getText().split(/\s+/).filter(Boolean).length;
-          await DocumentRepo.update(activeDoc.id, { content: json, wordCount: wc });
-          setSaveStatus('salvo ✓');
-          setActiveDoc(prev => prev ? { ...prev, content: json } : null);
-        } catch (err) {
-          console.error('auto-save falhou:', err);
-          setSaveStatus('erro ao salvar');
-        }
+      const current = mdRef.current;
+      if (current === activeDoc.mdContent) return;
+      try {
+        const wc = current.split(/\s+/).filter(Boolean).length;
+        await DocumentRepo.update(activeDoc.id, {
+          mdContent: current,
+          wordCount: wc,
+          editorMode: 'md',
+        });
+        setSaveStatus('salvo ✓');
+        setActiveDoc(prev => prev ? { ...prev, mdContent: current } : null);
+      } catch {
+        setSaveStatus('erro ao salvar');
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [editor, activeDoc?.id]);
+  }, [editorMode, activeDoc?.id, activeDoc?.mdContent]);
 
-  // Manual save
-  const handleSave = useCallback(async () => {
-    if (!editor || !activeDoc?.id) return;
-    try {
+  // ── TipTap auto-save (every 3s) ──────────────────────────────────
+  useEffect(() => {
+    if (editorMode !== 'tex' || !editor || !activeDoc?.id) return;
+    const interval = setInterval(async () => {
       const json = editor.getJSON();
-      const wc = editor.getText().split(/\s+/).filter(Boolean).length;
-      await DocumentRepo.update(activeDoc.id, { content: json, wordCount: wc });
+      if (JSON.stringify(json) === JSON.stringify(activeDoc.content)) return;
+      try {
+        const wc = editor.getText().split(/\s+/).filter(Boolean).length;
+        await DocumentRepo.update(activeDoc.id, {
+          content: json,
+          wordCount: wc,
+          editorMode: 'tex',
+        });
+        setSaveStatus('salvo ✓');
+        setActiveDoc(prev => prev ? { ...prev, content: json } : null);
+      } catch {
+        setSaveStatus('erro ao salvar');
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [editor, editorMode, activeDoc?.id, activeDoc?.content]);
+
+  // ── Manual save ──────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (!activeDoc?.id) return;
+    try {
+      if (editorMode === 'md') {
+        const wc = mdRef.current.split(/\s+/).filter(Boolean).length;
+        await DocumentRepo.update(activeDoc.id, {
+          mdContent: mdRef.current,
+          wordCount: wc,
+          editorMode: 'md',
+        });
+      } else {
+        if (!editor) return;
+        const json = editor.getJSON();
+        const wc = editor.getText().split(/\s+/).filter(Boolean).length;
+        await DocumentRepo.update(activeDoc.id, {
+          content: json,
+          wordCount: wc,
+          editorMode: 'tex',
+        });
+      }
       setSaveStatus('salvo ✓');
-      setActiveDoc(prev => prev ? { ...prev, content: json } : null);
-    } catch (err) {
-      console.error('salvar falhou:', err);
+    } catch {
       setSaveStatus('erro ao salvar');
     }
-  }, [editor, activeDoc]);
+  }, [editor, activeDoc, editorMode]);
 
-  // Export LaTeX
+  // ── Export ───────────────────────────────────────────────────────
   const handleExportLatex = useCallback(() => {
-    if (!editor || !activeDoc) return;
-    try {
-      const json = editor.getJSON();
-      const latex = convertToLatex(json, activeDoc.template || 'free', {
-        title: activeDoc.title,
-        author: 'Sabino, S.S.',
-        institution: 'CIn/UFPE',
-      });
-      downloadFile(latex, `${slugify(activeDoc.title)}.tex`, 'text/x-tex');
-    } catch (err) {
-      console.error('exportar .tex falhou:', err);
-      setSaveStatus('erro ao exportar');
+    if (!activeDoc) return;
+    if (editorMode === 'md') {
+      // Export markdown as .md file
+      downloadFile(mdRef.current, `${slugify(activeDoc.title)}.md`, 'text/markdown');
+    } else {
+      if (!editor) return;
+      try {
+        const json = editor.getJSON();
+        const latex = convertToLatex(json, activeDoc.template || 'free', {
+          title: activeDoc.title,
+          author: 'Sabino, S.S.',
+          institution: 'CIn/UFPE',
+        });
+        downloadFile(latex, `${slugify(activeDoc.title)}.tex`, 'text/x-tex');
+      } catch (err) {
+        console.error('exportar .tex falhou:', err);
+        setSaveStatus('erro ao exportar');
+      }
     }
-  }, [editor, activeDoc]);
+  }, [editor, activeDoc, editorMode]);
 
-  if (!activeDoc) return null;
+  // ── Mode toggle ──────────────────────────────────────────────────
+  const handleModeToggle = useCallback((newMode) => {
+    if (newMode === editorMode) return;
+    setSaveStatus('editando...');
+    setEditorMode(newMode);
+    // Persist mode immediately
+    if (activeDoc?.id) {
+      DocumentRepo.update(activeDoc.id, { editorMode: newMode }).catch(() => {});
+    }
+  }, [editorMode, activeDoc?.id]);
 
-  // Refs recentes do Acervo (reais — nunca fixas). Sem link direto doc↔referência
-  // no schema ainda, então usamos as mais relevantes (favoritas/lidas recentemente)
-  // como proxy até existir vínculo por documento.
+  // ── Word count ───────────────────────────────────────────────────
+  const wordCount = editorMode === 'md'
+    ? mdContent.split(/\s+/).filter(Boolean).length
+    : (editor?.getText().split(/\s+/).filter(Boolean).length ?? 0);
+
+  // ── Refs for sidebar ─────────────────────────────────────────────
   const refs = [...allRefs]
     .sort((a, b) => (b.isFavorite === a.isFavorite ? 0 : b.isFavorite ? 1 : -1))
     .slice(0, 6)
@@ -120,6 +224,55 @@ export function EditorPage({ profileId }) {
       read: r.isRead,
     }));
 
+  if (!activeDoc) return null;
+
+  // ── Markdown mode ─────────────────────────────────────────────────
+  if (editorMode === 'md') {
+    return (
+      <div className={styles.page}>
+        <EditorToolbar
+          editor={null}
+          doc={activeDoc}
+          saveStatus={saveStatus}
+          onBack={() => navigate('/bancada')}
+          onSave={handleSave}
+          onExportLatex={handleExportLatex}
+          previewOpen={previewOpen}
+          onTogglePreview={() => setPreviewOpen(p => !p)}
+          editorMode={editorMode}
+          onModeToggle={handleModeToggle}
+          wordCount={wordCount}
+          mdMode
+        />
+
+        <div className={styles.body}>
+          {/* Raw markdown textarea */}
+          <div className={styles.mdEditorArea}>
+            <textarea
+              ref={mdTextareaRef}
+              className={styles.mdTextarea}
+              value={mdContent}
+              onChange={e => {
+                setMdContent(e.target.value);
+                mdRef.current = e.target.value;
+                setSaveStatus('editando...');
+              }}
+              placeholder={'# Título\n\nComece a escrever em Markdown...\n\n## Seção\n\nUse **negrito**, *itálico*, `código`, tabelas e muito mais.'}
+              spellCheck={false}
+            />
+          </div>
+
+          {/* Live markdown preview */}
+          <MarkdownPreview
+            content={mdContent}
+            docTitle={activeDoc.title}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── LaTeX/WYSIWYG mode ────────────────────────────────────────────
   return (
     <div className={styles.page}>
       <EditorToolbar
@@ -131,6 +284,9 @@ export function EditorPage({ profileId }) {
         onExportLatex={handleExportLatex}
         previewOpen={previewOpen}
         onTogglePreview={() => setPreviewOpen(p => !p)}
+        editorMode={editorMode}
+        onModeToggle={handleModeToggle}
+        wordCount={wordCount}
       />
 
       <div className={styles.body}>
@@ -151,20 +307,4 @@ export function EditorPage({ profileId }) {
       </div>
     </div>
   );
-}
-
-// â”€â”€ Helpers â”€â”€
-
-function slugify(str) {
-  return str.split(' ').slice(0, 4).join('_').toLowerCase()
-    .replace(/[^a-z0-9_]/g, '');
-}
-
-function downloadFile(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }

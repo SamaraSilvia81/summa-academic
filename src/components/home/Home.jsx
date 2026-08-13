@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Books, Lightning, NotePencil, Star, ArrowRight,
-  BookOpenText, Eye, Graph, ArrowUpRight,
+  BookOpenText, Eye, Graph, ArrowUpRight, ArrowSquareOut,
+  TagSimple, X,
 } from '@phosphor-icons/react';
 import { useReferences, useDocuments, useRadarItems, useRadarStats, useProfile } from '../../hooks/useData';
 import { ReferenceGraph } from './ReferenceGraph';
@@ -17,167 +19,16 @@ const TL = {
   post: 'post', thread: 'thread', news: 'notícia',
 };
 
-function StatCard({ label, value, icon: Icon, color, sub, onClick }) {
+/* ── Glass Card wrapper ── */
+function Glass({ children, style = {}, className = '' }) {
   return (
-    <button onClick={onClick} style={{
-      flex: '1 1 0', minWidth: 0,
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      padding: '18px 20px 16px',
-      background: 'var(--bg2)', border: '1px solid var(--brd)',
-      borderRadius: 12, cursor: onClick ? 'pointer' : 'default',
-      textAlign: 'left', transition: 'border-color 0.15s, box-shadow 0.15s',
-      gap: 12,
-    }}
-      onMouseEnter={e => { if (onClick) { e.currentTarget.style.borderColor = color + '44'; e.currentTarget.style.boxShadow = `0 4px 20px ${color}10`; } }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--brd)'; e.currentTarget.style.boxShadow = 'none'; }}
-    >
-      <div style={{
-        width: 30, height: 30, borderRadius: 8,
-        background: color + '14', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Icon size={15} color={color} weight="duotone" />
-      </div>
-      <div>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800,
-          color: 'var(--tx)', lineHeight: 1, letterSpacing: '-0.03em',
-        }}>{value}</div>
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
-          letterSpacing: '0.04em', marginTop: 4,
-        }}>{label}</div>
-        {sub && <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 9, color: color,
-          marginTop: 3, opacity: 0.75,
-        }}>{sub}</div>}
-      </div>
-    </button>
-  );
-}
-
-function RefRow({ reference: r, onClick }) {
-  const tc = TC[r.type] || '#8A8680';
-  const tl = TL[r.type] || r.type;
-  return (
-    <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 0', borderBottom: '1px solid var(--brd)',
-      cursor: 'pointer', transition: 'padding-left 0.12s',
-    }}
-      onMouseEnter={e => e.currentTarget.style.paddingLeft = '5px'}
-      onMouseLeave={e => e.currentTarget.style.paddingLeft = '0'}
-    >
-      <div style={{ width: 3, height: 28, borderRadius: 2, background: tc, flexShrink: 0, opacity: 0.7 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--tx)',
-          fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{r.title}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', marginTop: 2 }}>
-          {r.authors ? r.authors.split(',')[0].trim() : '—'}{r.year ? ` · ${r.year}` : ''}
-        </div>
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 9, color: tc,
-        background: tc + '14', border: `1px solid ${tc}28`,
-        borderRadius: 3, padding: '2px 6px', flexShrink: 0,
-      }}>{tl}</span>
-      {r.isFavorite && <Star size={10} weight="fill" color="#D4A030" style={{ flexShrink: 0 }} />}
-    </div>
-  );
-}
-
-function RadarRow({ item }) {
-  const score = item.relevanceScore || 0;
-  const sc = score >= 70 ? '#4ADE80' : score >= 40 ? '#D4A030' : '#8A8680';
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: 8,
-      padding: '9px 0', borderBottom: '1px solid var(--brd)',
-    }}>
-      <div style={{
-        width: 6, height: 6, borderRadius: '50%',
-        background: sc, flexShrink: 0, marginTop: 4,
-      }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--tx)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{item.title}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', marginTop: 1 }}>
-          {item.source || item.type}
-        </div>
-      </div>
-      {score > 0 && <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-        color: sc, flexShrink: 0, paddingTop: 1,
-      }}>{score}%</span>}
-    </div>
-  );
-}
-
-function DocRow({ doc, onClick }) {
-  return (
-    <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 0', borderBottom: '1px solid var(--brd)',
-      cursor: 'pointer', transition: 'padding-left 0.12s',
-    }}
-      onMouseEnter={e => e.currentTarget.style.paddingLeft = '5px'}
-      onMouseLeave={e => e.currentTarget.style.paddingLeft = '0'}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--tx)',
-          fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{doc.title || 'Sem título'}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', marginTop: 2 }}>
-          {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString('pt-BR') : '—'}
-          {doc.template ? ` · ${doc.template}` : ''}
-        </div>
-      </div>
-      <ArrowUpRight size={12} color="var(--tx3)" style={{ flexShrink: 0 }} />
-    </div>
-  );
-}
-
-function SectionHeader({ icon: Icon, title, action, onAction, meta }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      marginBottom: 10,
-    }}>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-        color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.1em',
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        <Icon size={11} weight="duotone" /> {title}
-        {meta && <span style={{ color: 'var(--tx3)', fontWeight: 400, opacity: 0.6 }}>{meta}</span>}
-      </span>
-      {action && (
-        <button onClick={onAction} style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--acc)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
-          background: 'none', border: 'none', padding: 0, opacity: 0.8,
-        }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
-        >
-          {action} <ArrowRight size={10} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function Card({ children, style = {} }) {
-  return (
-    <div style={{
-      background: 'var(--bg2)', border: '1px solid var(--brd)',
-      borderRadius: 12, padding: '18px 20px',
-      display: 'flex', flexDirection: 'column',
+    <div className={className} style={{
+      background: 'var(--glass-bg)',
+      backdropFilter: 'blur(20px) saturate(1.3)',
+      WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 14,
+      padding: '14px 16px',
       ...style,
     }}>
       {children}
@@ -185,52 +36,205 @@ function Card({ children, style = {} }) {
   );
 }
 
-function ReadGauge({ pct }) {
-  const r = 26, circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
+/* ── Stat chip (compact, glass) ── */
+function StatChip({ label, value, color, icon: Icon, onClick }) {
   return (
-    <svg width={66} height={66} style={{ flexShrink: 0 }}>
-      <circle cx={33} cy={33} r={r} fill="none" stroke="var(--bg4)" strokeWidth={5} />
-      <circle cx={33} cy={33} r={r} fill="none"
-        stroke={pct > 60 ? '#4ADE80' : 'var(--acc)'} strokeWidth={5}
-        strokeDasharray={`${dash} ${circ - dash}`}
-        strokeDashoffset={circ / 4}
-        strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.8s ease' }}
-      />
-      <text x={33} y={33} textAnchor="middle" dominantBaseline="central"
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, fill: 'var(--tx)' }}>
-        {pct}%
-      </text>
-    </svg>
+    <button onClick={onClick} style={{
+      background: 'var(--glass-bg)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 10, padding: '10px 14px',
+      cursor: onClick ? 'pointer' : 'default',
+      display: 'flex', flexDirection: 'column', gap: 6,
+      minWidth: 90, transition: 'border-color 0.15s',
+      textAlign: 'left',
+    }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = color + '33'; }}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--glass-border)'}
+    >
+      <Icon size={13} color={color} weight="duotone" style={{ opacity: 0.7 }} />
+      <div>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800,
+          color: 'var(--tx)', lineHeight: 1, letterSpacing: '-0.03em',
+        }}>{value}</div>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--tx3)',
+          letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 3,
+        }}>{label}</div>
+      </div>
+    </button>
   );
 }
 
+/* ── Tiny section header inside glass cards ── */
+function GlassHeader({ icon: Icon, title, action, onAction }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      marginBottom: 8,
+    }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+        color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.1em',
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        <Icon size={10} weight="duotone" /> {title}
+      </span>
+      {action && (
+        <button onClick={onAction} style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--acc)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2,
+          background: 'none', border: 'none', padding: 0, opacity: 0.7,
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '0.7'}
+        >
+          {action} <ArrowRight size={9} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ── Reference row (compact) ── */
+function RefRow({ reference: r, onClick }) {
+  const tc = TC[r.type] || '#8A8680';
+  const tl = TL[r.type] || r.type;
+  return (
+    <div onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '6px 0', borderBottom: '1px solid var(--brd)',
+      cursor: 'pointer',
+    }}>
+      <div style={{ width: 3, height: 20, borderRadius: 2, background: tc, flexShrink: 0, opacity: 0.6 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)', fontSize: 11.5, color: 'var(--tx)',
+          fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{r.title}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', marginTop: 1 }}>
+          {r.authors ? r.authors.split(',')[0].trim() : '—'}{r.year ? ` · ${r.year}` : ''}
+        </div>
+      </div>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 8, color: tc,
+        background: tc + '14', border: `1px solid ${tc}22`,
+        borderRadius: 3, padding: '1px 5px', flexShrink: 0,
+      }}>{tl}</span>
+    </div>
+  );
+}
+
+/* ── Radar row (compact) ── */
+function RadarRow({ item }) {
+  const score = item.relevanceScore || 0;
+  const sc = score >= 70 ? '#4ADE80' : score >= 40 ? '#D4A030' : '#8A8680';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '5px 0', borderBottom: '1px solid var(--brd)',
+    }}>
+      <div style={{
+        width: 5, height: 5, borderRadius: '50%',
+        background: sc, flexShrink: 0,
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--tx)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{item.title}</div>
+      </div>
+      {score > 0 && <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700,
+        color: sc, flexShrink: 0,
+      }}>{score}%</span>}
+    </div>
+  );
+}
+
+/* ── Doc row (compact) ── */
+function DocRow({ doc, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '6px 0', borderBottom: '1px solid var(--brd)',
+      cursor: 'pointer',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-body)', fontSize: 11.5, color: 'var(--tx)',
+          fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{doc.title || 'Sem título'}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--tx3)', marginTop: 1 }}>
+          {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString('pt-BR') : '—'}
+        </div>
+      </div>
+      <ArrowUpRight size={10} color="var(--tx3)" style={{ flexShrink: 0 }} />
+    </div>
+  );
+}
+
+/* ── Read progress gauge (small) ── */
+function ReadGauge({ pct, read, total }) {
+  const r = 22, circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <svg width={52} height={52} style={{ flexShrink: 0 }}>
+        <circle cx={26} cy={26} r={r} fill="none" stroke="var(--glass-border)" strokeWidth={4} />
+        <circle cx={26} cy={26} r={r} fill="none"
+          stroke={pct > 60 ? '#4ADE80' : 'var(--acc)'} strokeWidth={4}
+          strokeDasharray={`${dash} ${circ - dash}`}
+          strokeDashoffset={circ / 4}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dasharray 0.8s ease' }}
+        />
+        <text x={26} y={26} textAnchor="middle" dominantBaseline="central"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, fill: 'var(--tx)' }}>
+          {pct}%
+        </text>
+      </svg>
+      <div>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700,
+          color: 'var(--tx)', lineHeight: 1,
+        }}>{read}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--tx3)', marginTop: 2 }}>
+          de {total} lidos
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Type distribution mini bars ── */
 function TypeBar({ refs }) {
   const counts = {};
   refs.forEach(r => { counts[r.type] = (counts[r.type] || 0) + 1; });
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const max = sorted[0]?.[1] || 1;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {sorted.map(([type, count]) => {
         const tc = TC[type] || '#8A8680';
         const tl = TL[type] || type;
         return (
-          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
-              width: 44, textAlign: 'right', flexShrink: 0,
+              fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--tx3)',
+              width: 36, textAlign: 'right', flexShrink: 0,
             }}>{tl}</span>
-            <div style={{ flex: 1, height: 4, background: 'var(--bg4)', borderRadius: 2 }}>
+            <div style={{ flex: 1, height: 3, background: 'var(--glass-border)', borderRadius: 2 }}>
               <div style={{
                 width: `${(count / max) * 100}%`, height: '100%',
-                background: tc, borderRadius: 2, opacity: 0.75,
+                background: tc, borderRadius: 2, opacity: 0.7,
                 transition: 'width 0.6s ease',
               }} />
             </div>
             <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)', width: 16, flexShrink: 0,
+              fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--tx3)', width: 14, flexShrink: 0,
             }}>{count}</span>
           </div>
         );
@@ -239,6 +243,9 @@ function TypeBar({ refs }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════════
+   HOME — graph-centric layout com glass overlays
+   ══════════════════════════════════════════════════════════ */
 export function Home({ profileId }) {
   const navigate = useNavigate();
   const profile = useProfile();
@@ -246,6 +253,7 @@ export function Home({ profileId }) {
   const documents = useDocuments(profileId);
   const radarItems = useRadarItems(profileId);
   const radarStats = useRadarStats(profileId);
+  const [selectedNode, setSelectedNode] = useState(null);
 
   const refs = references || [];
   const docs = documents || [];
@@ -265,36 +273,59 @@ export function Home({ profileId }) {
 
   const recentRefs = [...refs]
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-    .slice(0, 6);
+    .slice(0, 5);
 
   const recentDocs = [...docs]
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-    .slice(0, 4);
+    .slice(0, 3);
 
   const topRadar = [...radar]
     .filter(i => !i.isRead && !i.isDismissed)
     .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-    .slice(0, 5);
+    .slice(0, 4);
 
   const firstName = profile?.name?.split(' ')[0] || 'Pesquisador';
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
   return (
-    <div className="animate-fade-in" style={{ padding: '0 0 48px', overflow: 'hidden' }}>
+    <div className="animate-fade-in" style={{
+      position: 'relative',
+      height: 'calc(100vh - 40px)',
+      overflow: 'hidden',
+    }}>
+      {/* ── Radial glow de fundo ── */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 55% 45% at 50% 48%, rgba(212,160,48,0.05) 0%, transparent 70%)',
+      }} />
 
-      {/* ── Greeting ── */}
-      <div style={{ padding: '28px 0 20px' }}>
+      {/* ── Grafo ocupa TUDO — fundo total ── */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 1,
+      }}>
+        <ReferenceGraph
+          references={refs}
+          profileId={profileId}
+          selectedNode={selectedNode}
+          onSelectNode={setSelectedNode}
+        />
+      </div>
+
+      {/* ── Greeting (top left, floating sobre o grafo) ── */}
+      <div style={{
+        position: 'absolute', top: 18, left: 18, zIndex: 10,
+      }}>
         <div style={{
           fontFamily: 'var(--font-display)', fontWeight: 800,
-          fontSize: 'clamp(1.7rem, 2.6vw, 2.2rem)', color: 'var(--tx)',
+          fontSize: 'clamp(1.3rem, 2vw, 1.75rem)', color: 'var(--tx)',
           lineHeight: 1.15, letterSpacing: '-0.03em',
         }}>
           {greeting}, <span style={{ color: 'var(--acc)' }}>{firstName}</span>
         </div>
         <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)', marginTop: 5,
-          display: 'flex', alignItems: 'center', gap: 8,
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--tx3)', marginTop: 4,
+          display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           {thisWeekRefs > 0 && <>
@@ -304,115 +335,80 @@ export function Home({ profileId }) {
         </div>
       </div>
 
-      {/* ── Stat cards ── */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <StatCard label="referências" value={totalRefs} color="var(--acc)" icon={Books} onClick={() => navigate('/acervo')} />
-        <StatCard label="lidos" value={readRefs} color="#4ADE80" icon={BookOpenText}
-          sub={readPct > 0 ? `${readPct}% do acervo` : undefined} />
-        <StatCard label="favoritos" value={favRefs} color="#F472B6" icon={Star} />
-        <StatCard label="novidades" value={unreadRadar} color="#60A5FA" icon={Lightning}
-          sub={unreadRadar > 0 ? 'não lidas' : undefined}
-          onClick={() => navigate('/farol')} />
+      {/* ── Stat chips (top right, floating) ── */}
+      <div style={{
+        position: 'absolute', top: 18, right: 18, zIndex: 10,
+        display: 'flex', gap: 6,
+      }}>
+        <StatChip label="referências" value={totalRefs} color="var(--acc)" icon={Books} onClick={() => navigate('/acervo')} />
+        <StatChip label="lidos" value={readRefs} color="#4ADE80" icon={BookOpenText} />
+        <StatChip label="favoritos" value={favRefs} color="#F472B6" icon={Star} />
+        <StatChip label="radar" value={unreadRadar} color="#60A5FA" icon={Lightning} onClick={() => navigate('/farol')} />
       </div>
 
-      {/* ── Layout 3fr + 2fr ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 12, alignItems: 'start' }}>
-
-        {/* Coluna esquerda */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-
-          {/* Grafo — ocupa a largura disponível sem overflow */}
-          <Card style={{ padding: '18px 20px 14px' }}>
-            <SectionHeader
-              icon={Graph} title="mapa de referências"
-              action="ver acervo" onAction={() => navigate('/acervo')}
-              meta={refs.length > 0 ? ` · ${refs.length} nós` : undefined}
-            />
-            {/* wrapper com overflow hidden pra conter o SVG fixo do grafo */}
-            <div style={{ overflow: 'hidden', borderRadius: 8, margin: '0 -2px' }}>
-              <ReferenceGraph references={refs} profileId={profileId} />
+      {/* ── Cards flutuando na base, sobre o grafo ── */}
+      <div style={{
+        position: 'absolute', bottom: 18, left: 18, right: 18, zIndex: 10,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 10,
+      }}>
+        {/* Refs recentes */}
+        <Glass>
+          <GlassHeader icon={Books} title="referências recentes" action="acervo" onAction={() => navigate('/acervo')} />
+          {recentRefs.length > 0 ? recentRefs.map(r => (
+            <RefRow key={r.id} reference={r} onClick={() => navigate('/acervo')} />
+          )) : (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', padding: '14px 0', textAlign: 'center' }}>
+              nenhuma referência ainda
             </div>
-          </Card>
-
-          {/* Refs recentes */}
-          <Card>
-            <SectionHeader icon={Books} title="referências recentes" action="ver acervo" onAction={() => navigate('/acervo')} />
-            {recentRefs.length > 0 ? recentRefs.map(r => (
-              <RefRow key={r.id} reference={r} onClick={() => navigate('/acervo')} />
-            )) : (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-                padding: '20px 0', textAlign: 'center',
-              }}>nenhuma referência ainda</div>
-            )}
-          </Card>
-
-          {/* Bancada */}
-          <Card>
-            <SectionHeader icon={NotePencil} title="bancada" action="ver docs" onAction={() => navigate('/bancada')} />
-            {recentDocs.length > 0 ? recentDocs.map(doc => (
-              <DocRow key={doc.id} doc={doc} onClick={() => navigate('/bancada')} />
-            )) : (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-                padding: '20px 0', textAlign: 'center',
-              }}>nenhum documento</div>
-            )}
-          </Card>
-        </div>
-
-        {/* Coluna direita */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-
-          {/* Progresso */}
-          <Card>
-            <SectionHeader icon={Eye} title="progresso de leitura" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <ReadGauge pct={readPct} />
-              <div>
-                <div style={{
-                  fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
-                  color: 'var(--tx)', lineHeight: 1,
-                }}>{readRefs} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--tx3)' }}>lidos</span></div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', marginTop: 3 }}>
-                  {totalRefs - readRefs} pendentes
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Por tipo */}
-          {refs.length > 0 && (
-            <Card>
-              <SectionHeader icon={Graph} title="por tipo" action="acervo" onAction={() => navigate('/acervo')} />
-              <TypeBar refs={refs} />
-            </Card>
           )}
+        </Glass>
 
-          {/* Radar */}
-          <Card>
-            <SectionHeader icon={Lightning} title="radar" action="ver farol" onAction={() => navigate('/farol')} />
-            {radarStats && (
-              <div style={{
-                display: 'flex', gap: 12, marginBottom: 8,
-                fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)',
-              }}>
-                <span><strong style={{ color: 'var(--acc)' }}>{radarStats.total || 0}</strong> itens</span>
-                <span><strong style={{ color: '#4ADE80' }}>{radarStats.read || 0}</strong> lidos</span>
-                <span>avg <strong style={{ color: 'var(--tx2)' }}>{radarStats.avgRelevance || 0}%</strong></span>
-              </div>
-            )}
-            {topRadar.length > 0 ? topRadar.map(item => (
-              <RadarRow key={item.id} item={item} />
-            )) : (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--tx3)',
-                padding: '20px 0', textAlign: 'center',
-              }}>sem novidades</div>
-            )}
-          </Card>
+        {/* Progresso + Tipo */}
+        <Glass>
+          <GlassHeader icon={Eye} title="progresso de leitura" />
+          <ReadGauge pct={readPct} read={readRefs} total={totalRefs} />
+          {refs.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--brd)' }}>
+              <TypeBar refs={refs} />
+            </div>
+          )}
+        </Glass>
 
-        </div>
+        {/* Radar */}
+        <Glass>
+          <GlassHeader icon={Lightning} title="radar" action="farol" onAction={() => navigate('/farol')} />
+          {radarStats && (
+            <div style={{
+              display: 'flex', gap: 10, marginBottom: 6,
+              fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--tx3)',
+            }}>
+              <span><strong style={{ color: 'var(--acc)' }}>{radarStats.total || 0}</strong> itens</span>
+              <span><strong style={{ color: '#4ADE80' }}>{radarStats.read || 0}</strong> lidos</span>
+              <span>avg <strong style={{ color: 'var(--tx2)' }}>{radarStats.avgRelevance || 0}%</strong></span>
+            </div>
+          )}
+          {topRadar.length > 0 ? topRadar.map(item => (
+            <RadarRow key={item.id} item={item} />
+          )) : (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', padding: '14px 0', textAlign: 'center' }}>
+              sem novidades
+            </div>
+          )}
+        </Glass>
+
+        {/* Bancada */}
+        <Glass>
+          <GlassHeader icon={NotePencil} title="bancada" action="docs" onAction={() => navigate('/bancada')} />
+          {recentDocs.length > 0 ? recentDocs.map(doc => (
+            <DocRow key={doc.id} doc={doc} onClick={() => navigate('/bancada')} />
+          )) : (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--tx3)', padding: '14px 0', textAlign: 'center' }}>
+              nenhum documento
+            </div>
+          )}
+        </Glass>
       </div>
     </div>
   );
